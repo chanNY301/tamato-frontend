@@ -1,79 +1,136 @@
 <template>
-  <div class="login-container">
-    <div class="login-box">
-      <h2>{{ isLogin ? '登录' : '注册' }}</h2>
-      <form @submit.prevent="handleSubmit">
-        <div class="form-group">
-          <input 
-            type="text" 
-            v-model="form.username" 
-            placeholder="用户名" 
+  <div class="login-page">
+    <div class="login-container">
+      <AuthForm
+        :is-login="true"
+        :loading="loading"
+        :error="error"
+        :logo="logoUrl"
+        @submit="handleLogin"
+        @toggle-mode="$router.push('/register')"
+      >
+        <template #form-fields>
+          <FormInput
+            v-model="formData.username"
+            type="text"
+            label="用户名"
+            placeholder="请输入您的用户名"
             required
-          >
-        </div>
-        <div class="form-group">
-          <input 
-            type="password" 
-            v-model="form.password" 
-            placeholder="密码" 
+            :error="errors.username"
+          />
+          
+          <FormInput
+            v-model="formData.password"
+            type="password"
+            label="密码"
+            placeholder="请输入您的密码"
             required
-          >
-        </div>
-        <div v-if="!isLogin" class="form-group">
-          <input 
-            type="password" 
-            v-model="form.confirmPassword" 
-            placeholder="确认密码" 
-            required
-          >
-        </div>
-        <button type="submit" class="submit-btn">
-          {{ isLogin ? '登录' : '注册' }}
-        </button>
-      </form>
-      <p class="switch-mode">
-        {{ isLogin ? '没有账号？' : '已有账号？' }}
-        <span @click="toggleMode" class="switch-link">
-          {{ isLogin ? '立即注册' : '立即登录' }}
-        </span>
-      </p>
+            :error="errors.password"
+          />
+        </template>
+      </AuthForm>
     </div>
   </div>
 </template>
 
 <script>
+import AuthForm from '@/components/Login/AuthForm.vue'
+import FormInput from '@/components/Login/FormInput.vue'
+
 export default {
   name: 'LoginView',
+  components: {
+    AuthForm,
+    FormInput
+  },
   data() {
     return {
-      isLogin: true,
-      form: {
+      loading: false,
+      error: '',
+      formData: {
         username: '',
-        password: '',
-        confirmPassword: ''
-      }
+        password: ''
+      },
+      errors: {
+        username: '',
+        password: ''
+      },
+      logoUrl: require('@/assets/logo.png')
     }
   },
   methods: {
-    toggleMode() {
-      this.isLogin = !this.isLogin
-      this.form = {
+    validateForm() {
+      this.errors = {
         username: '',
-        password: '',
-        confirmPassword: ''
+        password: ''
+      }
+      let isValid = true
+
+      if (!this.formData.username) {
+        this.errors.username = '请输入用户名'
+        isValid = false
+      }
+
+      if (!this.formData.password) {
+        this.errors.password = '请输入密码'
+        isValid = false
+      }
+
+      return isValid
+    },
+
+    async handleLogin(formOptions) {
+      if (!this.validateForm()) {
+        return
+      }
+
+      this.loading = true
+      this.error = ''
+
+      try {
+        // 模拟登录API调用
+        await this.mockLoginAPI(this.formData)
+        
+        // 登录成功处理
+        this.$router.push('/dashboard')
+        
+        // 如果需要记住我，保存到localStorage
+        if (formOptions.rememberMe) {
+          localStorage.setItem('rememberMe', 'true')
+          localStorage.setItem('username', this.formData.username)
+        }
+      } catch (err) {
+        this.error = err.message || '登录失败，请重试'
+      } finally {
+        this.loading = false
       }
     },
-    handleSubmit() {
-      if (this.isLogin) {
-        // 登录逻辑
-        console.log('登录:', this.form)
-      } else {
-        // 注册逻辑
-        if (this.form.password !== this.form.confirmPassword) {
-          alert('两次密码输入不一致')
-          return
-        }
-        console.log('注册:', this.form)
+
+    mockLoginAPI(credentials) {
+      return new Promise((resolve, reject) => {
+        setTimeout(() => {
+          // 模拟验证逻辑
+          const users = JSON.parse(localStorage.getItem('users') || '[]')
+          const user = users.find(u => 
+            u.username === credentials.username && 
+            u.password === credentials.password
+          )
+          
+          if (user) {
+            resolve({ success: true, user })
+          } else {
+            reject(new Error('用户名或密码错误'))
+          }
+        }, 1500)
+      })
+    }
+  },
+  mounted() {
+    // 检查是否有保存的用户名
+    if (localStorage.getItem('rememberMe') === 'true') {
+      const savedUsername = localStorage.getItem('username')
+      if (savedUsername) {
+        this.formData.username = savedUsername
       }
     }
   }
@@ -81,76 +138,17 @@ export default {
 </script>
 
 <style scoped>
-.login-container {
-  display: flex;
-  justify-content: center;
-  align-items: center;
+.login-page {
   min-height: 100vh;
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: linear-gradient(135deg, #eeaa67 0%, #ffd7b4 100%);
+  padding: 1rem;
 }
 
-.login-box {
-  background: white;
-  padding: 40px;
-  border-radius: 10px;
-  box-shadow: 0 10px 25px rgba(0,0,0,0.2);
+.login-container {
   width: 100%;
   max-width: 400px;
-}
-
-h2 {
-  text-align: center;
-  margin-bottom: 30px;
-  color: #333;
-}
-
-.form-group {
-  margin-bottom: 20px;
-}
-
-input {
-  width: 100%;
-  padding: 12px;
-  border: 1px solid #ddd;
-  border-radius: 5px;
-  font-size: 16px;
-  box-sizing: border-box;
-}
-
-input:focus {
-  outline: none;
-  border-color: #667eea;
-}
-
-.submit-btn {
-  width: 100%;
-  padding: 12px;
-  background: #667eea;
-  color: white;
-  border: none;
-  border-radius: 5px;
-  font-size: 16px;
-  cursor: pointer;
-  transition: background 0.3s;
-}
-
-.submit-btn:hover {
-  background: #5a6fd8;
-}
-
-.switch-mode {
-  text-align: center;
-  margin-top: 20px;
-  color: #666;
-}
-
-.switch-link {
-  color: #667eea;
-  cursor: pointer;
-  text-decoration: underline;
-}
-
-.switch-link:hover {
-  color: #5a6fd8;
 }
 </style>
