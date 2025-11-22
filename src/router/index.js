@@ -1,20 +1,37 @@
 import { createRouter, createWebHistory } from 'vue-router'
+import HomeView from '../views/HomeView.vue'
 import Login from '../views/Login.vue'
 
 const routes = [
   {
     path: '/',
-    name: 'Login',
-    component: Login
+    name: 'home',
+    component: HomeView
   },
   {
     path: '/login',
-    redirect: '/'
+    name: 'login',
+    component: Login
+  },
+  {
+    path: '/task-management',
+    name: 'task-management',
+    component: () => import('../views/TaskManagementView.vue')
+  },
+  {
+    path: '/create-room',
+    name: 'create-room',
+    component: () => import('../views/CreateRoomView.vue')
+  },
+  {
+    path: '/join-room',
+    name: 'join-room',
+    component: () => import('../views/JoinRoomView.vue')
   }
 ]
 
 const router = createRouter({
-  history: createWebHistory(),
+  history: createWebHistory(process.env.BASE_URL),
   routes
 })
 
