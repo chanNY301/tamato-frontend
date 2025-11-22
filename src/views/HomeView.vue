@@ -1,0 +1,680 @@
+<template>
+  <div class="home-container">
+    <!-- 顶部导航栏 -->
+    <nav class="navbar">
+      <div class="nav-brand">Tomato</div>
+      <div class="nav-links">
+        <a class="nav-link" @click="goToFriends">好友</a>
+        <a class="nav-link" @click="goToTaskManagement">任务管理</a>
+        <a class="nav-link" @click="goToProfile">个人中心</a>
+      </div>
+      <div class="user-avatar-container">
+        <div 
+          class="user-avatar" 
+          @mouseenter="showDropdown = true"
+          @mouseleave="handleAvatarLeave"
+        >
+          <img :src="avatarImage" alt="用户头像" />
+        </div>
+        <!-- 下拉菜单 - 独立元素 -->
+        <div 
+          v-show="showDropdown" 
+          class="dropdown-menu"
+          @mouseenter="handleDropdownEnter"
+          @mouseleave="handleDropdownLeave"
+        >
+          <div class="dropdown-item" @click="toggleTheme">
+            <span class="dropdown-icon">🎨</span>
+            主题设置
+          </div>
+          <div class="dropdown-item" @click="logout">
+            <span class="dropdown-icon">🚪</span>
+            退出登录
+          </div>
+        </div>
+      </div>
+    </nav>
+
+    <!-- 主要内容网格区域 -->
+    <main class="main-grid">
+      <!-- 左侧小组件区域 (预留) -->
+      <aside class="widgets-area">
+        <div class="widget-placeholder">
+          <p>📊 学习数据</p>
+          <p>未来这里放小组件</p>
+        </div>
+        <div class="widget-placeholder">
+          <p>🏆 成就</p>
+          <p>未来这里放小组件</p>
+        </div>
+      </aside>
+
+      <!-- 中央内容区域 -->
+      <section class="content-area">
+        <!-- 海报轮播区 -->
+        <div class="poster-carousel">
+          <div class="poster-slide">
+            <!-- 修改这里：使用动态绑定的海报图片 -->
+            <img :src="currentPoster" alt="宣传海报" class="poster-image" />
+          </div>
+          <!-- 轮播箭头 -->
+          <button class="carousel-arrow left-arrow" @click="prevPoster">‹</button>
+          <button class="carousel-arrow right-arrow" @click="nextPoster">›</button>
+          
+          <!-- 新增：海报指示器（小圆点） -->
+          <div class="carousel-indicators">
+            <span 
+              v-for="(poster, index) in posters" 
+              :key="index"
+              :class="['indicator', { active: currentPosterIndex === index }]"
+              @click="switchPoster(index)"
+            ></span>
+          </div>
+        </div>
+
+        <!-- 快速加入区域 - 现在可以滚动 -->
+        <div class="quick-join">
+          <h3>快速加入</h3>
+          <div class="quick-join-list" ref="quickJoinList">
+            <!-- 快速加入的项目列表 -->
+            <div 
+              v-for="room in quickJoinRooms" 
+              :key="room.id" 
+              class="quick-join-item"
+            >
+              <div class="room-avatar">○</div>
+              <div class="room-info">
+                <div class="room-name">{{ room.name }}</div>
+                <div class="room-stats">{{ room.members }}人 · {{ room.status }}</div>
+              </div>
+              <button class="join-btn" @click="quickJoin(room.id)">加入</button>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- 右侧边栏 - 固定位置的重要按钮 -->
+      <aside class="right-sidebar">
+        <div class="sticky-buttons">
+          <button class="btn-primary" @click="createRoom">
+            <span class="btn-icon">➕</span>
+            创建自习室
+          </button>
+          <button class="btn-secondary" @click="joinRoom">
+            <span class="btn-icon">🔍</span>
+            加入自习室
+          </button>
+        </div>
+        
+        <div class="sidebar-placeholder">
+          <p>右侧边栏</p>
+          <p>未来这里可以放其他功能</p>
+        </div>
+      </aside>
+    </main>
+  </div>
+</template>
+
+<script>
+// 只导入头像，海报改为动态导入
+import avatarImage from '@/assets/images/avatar.png'
+
+export default {
+  name: 'HomeView',
+  data() {
+    return {
+      // 使用导入的图片
+      avatarImage: avatarImage,
+      
+      // 下拉菜单显示状态
+      showDropdown: false,
+      dropdownTimer: null,
+      
+      // 海报轮播数据 - 初始为空数组，将在created钩子中动态加载
+      posters: [],
+      currentPosterIndex: 0,
+      
+      // 快速加入房间的假数据
+      quickJoinRooms: [
+        { id: 1, name: '考研数学冲刺', members: 15, status: '专注中' },
+        { id: 2, name: '英语阅读小组', members: 8, status: '空闲' },
+        { id: 3, name: '深夜代码角', members: 25, status: '专注中' },
+        { id: 4, name: '物理学习室', members: 12, status: '空闲' },
+        { id: 5, name: '历史讨论组', members: 6, status: '空闲' },
+        { id: 6, name: '编程自习班', members: 18, status: '专注中' },
+        { id: 7, name: '化学实验室', members: 9, status: '空闲' },
+        { id: 8, name: '文学创作间', members: 11, status: '专注中' },
+        { id: 9, name: '医学考研组', members: 20, status: '专注中' },
+        { id: 10, name: '法律自习室', members: 7, status: '空闲' }
+      ]
+    }
+  },
+  computed: {
+    // 当前显示的海报
+    currentPoster() {
+      return this.posters.length > 0 ? this.posters[this.currentPosterIndex] : ''
+    }
+  },
+  created() {
+    // 组件创建时动态加载海报
+    this.loadPosters()
+  },
+  methods: {
+    // 动态加载海报图片
+    async loadPosters() {
+      try {
+        // 海报文件数量 - 根据你的文件列表，有6个海报
+        const posterCount = 6
+        
+        // 使用 Promise.all 并行加载所有海报
+        const posterPromises = []
+        
+        for (let i = 1; i <= posterCount; i++) {
+          // 动态导入海报图片
+          const posterPromise = import(`@/assets/images/poster${i}.jpg`)
+            .then(module => module.default)
+            .catch(error => {
+              console.warn(`无法加载海报 poster${i}.jpg:`, error)
+              return null
+            })
+          posterPromises.push(posterPromise)
+        }
+        
+        // 等待所有图片加载完成
+        const loadedPosters = await Promise.all(posterPromises)
+        
+        // 过滤掉加载失败的图片
+        this.posters = loadedPosters.filter(poster => poster !== null)
+        
+        console.log(`成功加载 ${this.posters.length} 张海报`)
+        
+      } catch (error) {
+        console.error('加载海报时出错:', error)
+        this.posters = [] // 确保posters始终是数组
+      }
+    },
+    
+    // 鼠标从头像移出
+    handleAvatarLeave() {
+      // 短暂延迟，让用户有时间移动到下拉菜单
+      this.dropdownTimer = setTimeout(() => {
+        this.showDropdown = false
+      }, 150)
+    },
+    
+    // 鼠标进入下拉菜单
+    handleDropdownEnter() {
+      // 取消隐藏计时器
+      if (this.dropdownTimer) {
+        clearTimeout(this.dropdownTimer)
+      }
+    },
+    
+    // 鼠标从下拉菜单移出
+    handleDropdownLeave() {
+      // 立即隐藏下拉菜单
+      this.showDropdown = false
+    },
+    
+    // 切换主题
+    toggleTheme() {
+      alert('主题设置功能待实现')
+      this.showDropdown = false
+    },
+    
+    // 退出登录 - 跳转到登录页面
+    logout() {
+      if (confirm('确定要退出登录吗？')) {
+        this.$router.push('/login')
+      }
+    },
+    
+    // 跳转到好友界面（预留）
+    goToFriends() {
+      alert('好友功能正在开发中...')
+      // this.$router.push('/friends') // 预留跳转逻辑
+    },
+    
+    // 跳转到任务管理界面
+    goToTaskManagement() {
+      this.$router.push('/task-management')
+    },
+    
+    // 跳转到个人中心（预留）
+    goToProfile() {
+      alert('个人中心功能正在开发中...')
+      // this.$router.push('/profile') // 预留跳转逻辑
+    },
+    
+    // 海报轮播方法
+    nextPoster() {
+      if (this.posters.length === 0) return
+      this.currentPosterIndex = (this.currentPosterIndex + 1) % this.posters.length
+    },
+    prevPoster() {
+      if (this.posters.length === 0) return
+      this.currentPosterIndex = (this.currentPosterIndex - 1 + this.posters.length) % this.posters.length
+    },
+    switchPoster(index) {
+      if (this.posters.length === 0) return
+      this.currentPosterIndex = index
+    },
+    
+    // 创建自习室
+    createRoom() {
+      this.$router.push('/create-room')
+    },
+    
+    // 加入自习室
+    joinRoom() {
+      this.$router.push('/join-room')
+    },
+    
+    quickJoin(roomId) {
+      alert(`快速加入房间 ${roomId} - 功能待实现`)
+    }
+  }
+}
+</script>
+
+<style scoped>
+/* 整体容器 */
+.home-container {
+  min-height: 100vh;
+  background-color: #f5f5f5;
+}
+
+/* 顶部导航栏 */
+.navbar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 12px 20px;
+  background: white;
+  border-bottom: 1px solid #e0e0e0;
+  position: sticky;
+  top: 0;
+  z-index: 100;
+}
+
+.nav-brand {
+  font-size: 1.5em;
+  font-weight: bold;
+  color: #667eea;
+}
+
+.nav-links {
+  display: flex;
+  gap: 30px;
+}
+
+.nav-link {
+  cursor: pointer;
+  padding: 8px 12px;
+  border-radius: 6px;
+  transition: background-color 0.2s;
+}
+
+.nav-link:hover {
+  background-color: #f0f0f0;
+}
+
+/* 用户头像容器 */
+.user-avatar-container {
+  position: relative;
+}
+
+/* 用户头像 */
+.user-avatar {
+  cursor: pointer;
+}
+
+.user-avatar img {
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  border: 2px solid #e0e0e0;
+  object-fit: cover;
+  transition: all 0.3s ease;
+}
+
+.user-avatar:hover img {
+  border-color: #667eea;
+  transform: scale(1.05);
+}
+
+/* 下拉菜单样式 */
+.dropdown-menu {
+  position: absolute;
+  top: 100%;
+  right: 0;
+  margin-top: 8px;
+  background: white;
+  border-radius: 8px;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.15);
+  min-width: 150px;
+  z-index: 1000;
+  border: 1px solid #e0e0e0;
+  overflow: hidden;
+  animation: dropdownFade 0.2s ease;
+}
+
+@keyframes dropdownFade {
+  from {
+    opacity: 0;
+    transform: translateY(-10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.dropdown-item {
+  display: flex;
+  align-items: center;
+  padding: 12px 16px;
+  cursor: pointer;
+  transition: background-color 0.2s;
+  border-bottom: 1px solid #f0f0f0;
+}
+
+.dropdown-item:last-child {
+  border-bottom: none;
+}
+
+.dropdown-item:hover {
+  background-color: #f8f9ff;
+}
+
+.dropdown-icon {
+  margin-right: 10px;
+  font-size: 1.1em;
+}
+
+/* 主网格布局 */
+.main-grid {
+  display: grid;
+  grid-template-columns: 250px 1fr 300px;
+  gap: 20px;
+  padding: 20px;
+  max-width: 1400px;
+  margin: 0 auto;
+}
+
+/* 小组件区域 */
+.widgets-area {
+  display: flex;
+  flex-direction: column;
+  gap: 15px;
+}
+
+.widget-placeholder {
+  background: white;
+  padding: 20px;
+  border-radius: 10px;
+  box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+  text-align: center;
+}
+
+/* 中央内容区域 */
+.content-area {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+/* 海报轮播 */
+.poster-carousel {
+  position: relative;
+  background: white;
+  border-radius: 12px;
+  overflow: hidden;
+  box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+}
+
+.poster-slide {
+  height: 400px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%);
+}
+
+.poster-image {
+  max-width: 90%;
+  max-height: 90%;
+  object-fit: contain;
+  border-radius: 8px;
+}
+
+.carousel-arrow {
+  position: absolute;
+  top: 50%;
+  transform: translateY(-50%);
+  background: rgba(0,0,0,0.5);
+  color: white;
+  border: none;
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  cursor: pointer;
+  font-size: 1.5em;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: background-color 0.3s;
+}
+
+.left-arrow {
+  left: 15px;
+}
+
+.right-arrow {
+  right: 15px;
+}
+
+.carousel-arrow:hover {
+  background: rgba(0,0,0,0.7);
+}
+
+/* 轮播指示器样式 */
+.carousel-indicators {
+  position: absolute;
+  bottom: 15px;
+  left: 50%;
+  transform: translateX(-50%);
+  display: flex;
+  gap: 8px;
+}
+
+.indicator {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.5);
+  cursor: pointer;
+  transition: all 0.3s ease;
+}
+
+.indicator.active {
+  background: white;
+  transform: scale(1.2);
+}
+
+.indicator:hover {
+  background: rgba(255, 255, 255, 0.8);
+}
+
+/* 快速加入区域 */
+.quick-join {
+  background: white;
+  padding: 20px;
+  border-radius: 12px;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+}
+
+.quick-join h3 {
+  margin: 0 0 15px 0;
+  color: #333;
+}
+
+.quick-join-list {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 12px;
+  max-height: 400px;
+  overflow-y: auto;
+  padding-right: 8px;
+}
+
+/* 自定义滚动条样式 */
+.quick-join-list::-webkit-scrollbar {
+  width: 6px;
+}
+
+.quick-join-list::-webkit-scrollbar-track {
+  background: #f1f1f1;
+  border-radius: 3px;
+}
+
+.quick-join-list::-webkit-scrollbar-thumb {
+  background: #c1c1c1;
+  border-radius: 3px;
+}
+
+.quick-join-list::-webkit-scrollbar-thumb:hover {
+  background: #a8a8a8;
+}
+
+.quick-join-item {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px;
+  border: 1px solid #e0e0e0;
+  border-radius: 8px;
+  transition: all 0.2s;
+}
+
+.quick-join-item:hover {
+  border-color: #667eea;
+  background: #f8f9ff;
+}
+
+.room-avatar {
+  font-size: 1.5em;
+}
+
+.room-info {
+  flex-grow: 1;
+}
+
+.room-name {
+  font-weight: bold;
+  margin-bottom: 4px;
+}
+
+.room-stats {
+  font-size: 0.8em;
+  color: #666;
+}
+
+.join-btn {
+  padding: 6px 12px;
+  background: #667eea;
+  color: white;
+  border: none;
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 0.9em;
+  transition: background-color 0.2s;
+}
+
+.join-btn:hover {
+  background: #5a6fd8;
+}
+
+/* 右侧边栏 */
+.right-sidebar {
+  position: sticky;
+  top: 100px;
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+  z-index: 90;
+  height: fit-content;
+}
+
+.sticky-buttons {
+  display: flex;
+  flex-direction: column;
+  gap: 15px;
+}
+
+.sticky-buttons button {
+  padding: 15px;
+  border: none;
+  border-radius: 10px;
+  font-size: 1.1em;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+}
+
+.btn-primary {
+  background: linear-gradient(135deg, #667eea, #764ba2);
+  color: white;
+}
+
+.btn-secondary {
+  background: white;
+  color: #667eea;
+  border: 2px solid #667eea;
+}
+
+.btn-primary:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(102, 126, 234, 0.4);
+}
+
+.btn-secondary:hover {
+  background: #667eea;
+  color: white;
+}
+
+.btn-icon {
+  font-size: 1.2em;
+}
+
+.sidebar-placeholder {
+  background: white;
+  padding: 20px;
+  border-radius: 10px;
+  box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+  text-align: center;
+}
+
+/* 响应式设计 */
+@media (max-width: 1024px) {
+  .main-grid {
+    grid-template-columns: 200px 1fr;
+  }
+  .right-sidebar {
+    display: none;
+  }
+}
+
+@media (max-width: 768px) {
+  .main-grid {
+    grid-template-columns: 1fr;
+    gap: 15px;
+  }
+  .widgets-area {
+    display: none;
+  }
+}
+</style>
