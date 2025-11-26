@@ -1,7 +1,11 @@
 import { createRouter, createWebHistory } from 'vue-router'
 import HomeView from '../views/HomeView.vue'
-import Login from '@/views/Login.vue'
-import Register from '@/views/Register.vue'
+import Login from '../views/Login.vue'
+import Register from '../views/Register.vue'
+import CreateRoomView from '../views/CreateRoomView.vue'
+import JoinRoomView from '../views/JoinRoomView.vue'
+import StudyRoomView from '../views/StudyRoomView.vue'
+import TaskManagementView from '../views/TaskManagementView.vue'
 
 const routes = [
   {
@@ -15,24 +19,30 @@ const routes = [
     component: Login
   },
   {
-    path: '/task-management',
-    name: 'task-management',
-    component: () => import('../views/TaskManagementView.vue')
+    path: '/register',
+    name: 'register',
+    component: Register
   },
   {
     path: '/create-room',
     name: 'create-room',
-    component: () => import('../views/CreateRoomView.vue')
+    component: CreateRoomView
   },
   {
     path: '/join-room',
     name: 'join-room',
-    component: () => import('../views/JoinRoomView.vue')
+    component: JoinRoomView
   },
   {
-    path: '/register',
-    name: 'Register',
-    component: Register
+    path: '/study-room/:roomId',
+    name: 'study-room',
+    component: StudyRoomView,
+    props: true
+  },
+  {
+    path: '/task-management',
+    name: 'task-management',
+    component: TaskManagementView
   }
 ]
 

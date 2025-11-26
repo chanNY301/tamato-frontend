@@ -281,7 +281,7 @@ export default {
 /* 整体容器 */
 .home-container {
   min-height: 100vh;
-  background-color: #f5f5f5;
+  background-color: #fefaf5; /* 浅橘黄色背景 */
 }
 
 /* 顶部导航栏 */
@@ -291,7 +291,7 @@ export default {
   align-items: center;
   padding: 12px 20px;
   background: white;
-  border-bottom: 1px solid #e0e0e0;
+  border-bottom: 1px solid #ffe4cc; /* 橘黄色边框 */
   position: sticky;
   top: 0;
   z-index: 100;
@@ -300,7 +300,7 @@ export default {
 .nav-brand {
   font-size: 1.5em;
   font-weight: bold;
-  color: #667eea;
+  color: #eeaa67; /* 橘黄色品牌色 */
 }
 
 .nav-links {
@@ -313,18 +313,123 @@ export default {
   padding: 8px 12px;
   border-radius: 6px;
   transition: background-color 0.2s;
+  color: #333;
 }
 
 .nav-link:hover {
-  background-color: #f0f0f0;
+  background-color: #fff5eb; /* 浅橘黄色悬停背景 */
+  color: #eeaa67; /* 橘黄色文字 */
 }
 
-/* 用户头像容器 */
+/* 用户头像 */
+.user-avatar:hover img {
+  border-color: #eeaa67; /* 橘黄色边框 */
+  transform: scale(1.05);
+}
+
+/* 下拉菜单样式 */
+.dropdown-item:hover {
+  background-color: #fff5eb; /* 浅橘黄色悬停背景 */
+}
+
+/* 小组件区域 */
+.widget-placeholder {
+  background: white;
+  padding: 20px;
+  border-radius: 10px;
+  box-shadow: 0 2px 4px rgba(238, 170, 103, 0.1); /* 橘黄色阴影 */
+  text-align: center;
+  border: 1px solid #ffe4cc; /* 橘黄色边框 */
+}
+
+/* 海报轮播 */
+.poster-carousel {
+  position: relative;
+  background: white;
+  border-radius: 12px;
+  overflow: hidden;
+  box-shadow: 0 4px 8px rgba(238, 170, 103, 0.1); /* 橘黄色阴影 */
+  border: 1px solid #ffe4cc; /* 橘黄色边框 */
+}
+
+.poster-slide {
+  height: 400px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: linear-gradient(135deg, #fef6f0 0%, #ffe4cc 100%); /* 橘黄色渐变背景 */
+}
+
+/* 快速加入区域 */
+.quick-join {
+  background: white;
+  padding: 20px;
+  border-radius: 12px;
+  box-shadow: 0 2px 8px rgba(238, 170, 103, 0.1); /* 橘黄色阴影 */
+  border: 1px solid #ffe4cc; /* 橘黄色边框 */
+}
+
+.quick-join h3 {
+  margin: 0 0 15px 0;
+  color: #333;
+}
+
+.quick-join-item:hover {
+  border-color: #eeaa67; /* 橘黄色边框 */
+  background: #fffaf5; /* 浅橘黄色背景 */
+}
+
+.join-btn {
+  padding: 6px 12px;
+  background: #eeaa67; /* 橘黄色按钮 */
+  color: white;
+  border: none;
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 0.9em;
+  transition: background-color 0.2s;
+}
+
+.join-btn:hover {
+  background: #e69c55; /* 深橘黄色 */
+}
+
+/* 右侧边栏按钮 */
+.btn-primary {
+  background: linear-gradient(135deg, #eeaa67, #f5b877); /* 橘黄色渐变 */
+  color: white;
+}
+
+.btn-secondary {
+  background: white;
+  color: #eeaa67; /* 橘黄色文字 */
+  border: 2px solid #eeaa67; /* 橘黄色边框 */
+}
+
+.btn-primary:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(238, 170, 103, 0.4); /* 橘黄色阴影 */
+}
+
+.btn-secondary:hover {
+  background: #eeaa67; /* 橘黄色背景 */
+  color: white;
+}
+
+.sidebar-placeholder {
+  background: white;
+  padding: 20px;
+  border-radius: 10px;
+  box-shadow: 0 2px 4px rgba(238, 170, 103, 0.1); /* 橘黄色阴影 */
+  text-align: center;
+  border: 1px solid #ffe4cc; /* 橘黄色边框 */
+}
+
+/* 其他样式保持不变 */
 .user-avatar-container {
   position: relative;
 }
 
-/* 用户头像 */
 .user-avatar {
   cursor: pointer;
 }
@@ -338,12 +443,6 @@ export default {
   transition: all 0.3s ease;
 }
 
-.user-avatar:hover img {
-  border-color: #667eea;
-  transform: scale(1.05);
-}
-
-/* 下拉菜单样式 */
 .dropdown-menu {
   position: absolute;
   top: 100%;
@@ -383,16 +482,11 @@ export default {
   border-bottom: none;
 }
 
-.dropdown-item:hover {
-  background-color: #f8f9ff;
-}
-
 .dropdown-icon {
   margin-right: 10px;
   font-size: 1.1em;
 }
 
-/* 主网格布局 */
 .main-grid {
   display: grid;
   grid-template-columns: 250px 1fr 300px;
@@ -402,43 +496,16 @@ export default {
   margin: 0 auto;
 }
 
-/* 小组件区域 */
 .widgets-area {
   display: flex;
   flex-direction: column;
   gap: 15px;
 }
 
-.widget-placeholder {
-  background: white;
-  padding: 20px;
-  border-radius: 10px;
-  box-shadow: 0 2px 4px rgba(0,0,0,0.1);
-  text-align: center;
-}
-
-/* 中央内容区域 */
 .content-area {
   display: flex;
   flex-direction: column;
   gap: 20px;
-}
-
-/* 海报轮播 */
-.poster-carousel {
-  position: relative;
-  background: white;
-  border-radius: 12px;
-  overflow: hidden;
-  box-shadow: 0 4px 8px rgba(0,0,0,0.1);
-}
-
-.poster-slide {
-  height: 400px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%);
 }
 
 .poster-image {
@@ -478,7 +545,6 @@ export default {
   background: rgba(0,0,0,0.7);
 }
 
-/* 轮播指示器样式 */
 .carousel-indicators {
   position: absolute;
   bottom: 15px;
@@ -506,19 +572,6 @@ export default {
   background: rgba(255, 255, 255, 0.8);
 }
 
-/* 快速加入区域 */
-.quick-join {
-  background: white;
-  padding: 20px;
-  border-radius: 12px;
-  box-shadow: 0 2px 8px rgba(0,0,0,0.1);
-}
-
-.quick-join h3 {
-  margin: 0 0 15px 0;
-  color: #333;
-}
-
 .quick-join-list {
   display: grid;
   grid-template-columns: 1fr;
@@ -528,7 +581,6 @@ export default {
   padding-right: 8px;
 }
 
-/* 自定义滚动条样式 */
 .quick-join-list::-webkit-scrollbar {
   width: 6px;
 }
@@ -557,11 +609,6 @@ export default {
   transition: all 0.2s;
 }
 
-.quick-join-item:hover {
-  border-color: #667eea;
-  background: #f8f9ff;
-}
-
 .room-avatar {
   font-size: 1.5em;
 }
@@ -580,22 +627,6 @@ export default {
   color: #666;
 }
 
-.join-btn {
-  padding: 6px 12px;
-  background: #667eea;
-  color: white;
-  border: none;
-  border-radius: 6px;
-  cursor: pointer;
-  font-size: 0.9em;
-  transition: background-color 0.2s;
-}
-
-.join-btn:hover {
-  background: #5a6fd8;
-}
-
-/* 右侧边栏 */
 .right-sidebar {
   position: sticky;
   top: 100px;
@@ -625,37 +656,8 @@ export default {
   gap: 8px;
 }
 
-.btn-primary {
-  background: linear-gradient(135deg, #667eea, #764ba2);
-  color: white;
-}
-
-.btn-secondary {
-  background: white;
-  color: #667eea;
-  border: 2px solid #667eea;
-}
-
-.btn-primary:hover {
-  transform: translateY(-2px);
-  box-shadow: 0 4px 12px rgba(102, 126, 234, 0.4);
-}
-
-.btn-secondary:hover {
-  background: #667eea;
-  color: white;
-}
-
 .btn-icon {
   font-size: 1.2em;
-}
-
-.sidebar-placeholder {
-  background: white;
-  padding: 20px;
-  border-radius: 10px;
-  box-shadow: 0 2px 4px rgba(0,0,0,0.1);
-  text-align: center;
 }
 
 /* 响应式设计 */
