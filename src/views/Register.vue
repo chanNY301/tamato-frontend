@@ -143,83 +143,38 @@ export default {
       this.error = ''
 
       try {
-        // 调用Mock API注册接口
-        const response = await this.registerAPI(this.formData)
-        
-        // 注册成功处理
-        if (response.code === 200) {
-          this.$router.push('/login')
-          
-          // 显示成功消息
-          this.showSuccessMessage('注册成功，请登录')
-        } else {
-          throw new Error(response.message || '注册失败')
-        }
-      } catch (err) {
-        this.error = err.message || '注册失败，请重试'
-      } finally {
-        this.loading = false
-      }
-    },
-
-    async registerAPI(userData) {
-      // 准备请求数据
-      const requestData = {
-        username: userData.username,
-        email: userData.email,
-        password_hash: userData.password //目前先直接传递
-      }
-
-      try {
-        // 本地mock
+        // 调用注册接口
         const response = await fetch('http://127.0.0.1:4523/m1/7239915-6966518-default/auth/register', {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
           },
-          body: JSON.stringify(requestData)
+          body: JSON.stringify({
+            username: this.formData.username,
+            email: this.formData.email,
+            password_hash: this.formData.password
+          })
         })
-
-        if (!response.ok) {
-          throw new Error(`HTTP error! status: ${response.status}`)
-        }
 
         const result = await response.json()
-        return result
-      } catch (error) {
-        // 如果网络请求失败，使用fallback的mock数据
-        console.warn('API请求失败，使用本地mock:', error.message)
-        return this.mockRegisterAPI(userData)
-      }
-    },
+        console.log('注册接口返回:', result) // 调试用，查看实际返回的code
 
-    mockRegisterAPI(userData) {
-      return new Promise((resolve) => {
-        setTimeout(() => {
-          const response = {
-            code: 200,
-            message: "注册成功",
-            data: {
-              userId: `100${Math.floor(Math.random() * 1000)}`,
-              username: userData.username
-            }
-          }
-          resolve(response)
-        }, 1000)
-      })
-    },
-
-    showSuccessMessage(message) {
-      // 使用Element UI的通知组件或其他UI库
-      if (this.$notify) {
-        this.$notify({
-          title: '成功',
-          message: message,
-          type: 'success'
-        })
-      } else {
-        // 如果没有UI库，使用浏览器原生alert
-        alert(message)
+        if (result.code === 200) {
+          // 200注册成功
+          this.error = '注册成功！正在跳转到登录页...'
+          
+          setTimeout(() => {
+            this.$router.push('/login')
+          }, 1000)
+        } else {
+          // 其他code都判定为失败
+          this.error = '注册失败，请重试'
+        }
+      } catch (err) {
+        this.error = '注册失败，请检查网络连接'
+        console.error('注册请求失败:', err)
+      } finally {
+        this.loading = false
       }
     }
   }
@@ -232,7 +187,7 @@ export default {
   display: flex;
   align-items: center;
   justify-content: center;
-  background: linear-gradient(135deg, #eeaa67 0%, #ffd7b4 100%);
+  background: linear-gradient(135deg, #ffffff 0%, #ffd7b4 100%);
   padding: 1rem;
 }
 

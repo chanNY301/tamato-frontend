@@ -79,7 +79,7 @@ export default {
       return isValid
     },
 
-    async handleLogin(formOptions) {
+    async handleLogin() {
       if (!this.validateForm()) {
         return
       }
@@ -88,52 +88,37 @@ export default {
       this.error = ''
 
       try {
-        // 模拟登录API调用
-        await this.mockLoginAPI(this.formData)
-        
-        // 登录成功处理
-        this.$router.push('/dashboard')
-        
-        // 如果需要记住我，保存到localStorage
-        if (formOptions.rememberMe) {
-          localStorage.setItem('rememberMe', 'true')
-          localStorage.setItem('username', this.formData.username)
+        // 调用本地 mock 接口
+        const response = await fetch('http://127.0.0.1:4523/m1/7239915-6966518-default/auth/login', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            username: this.formData.username,
+            password: this.formData.password
+          })
+        })
+
+        const result = await response.json()
+
+        if (result.code === 200) {
+          // 登录成功，跳转到首页
+          console.log('登录成功，跳转中')
+          setTimeout(() => {
+            this.$router.push('/')
+          }, 800)
+        } else {
+          this.error = '用户名或密码错误'
         }
       } catch (err) {
-        this.error = err.message || '登录失败，请重试'
+        this.error = '登录失败，请检查网络连接'
+        console.error('登录请求失败:', err)
       } finally {
         this.loading = false
       }
-    },
-
-    mockLoginAPI(credentials) {
-      return new Promise((resolve, reject) => {
-        setTimeout(() => {
-          // 模拟验证逻辑
-          const users = JSON.parse(localStorage.getItem('users') || '[]')
-          const user = users.find(u => 
-            u.username === credentials.username && 
-            u.password === credentials.password
-          )
-          
-          if (user) {
-            resolve({ success: true, user })
-          } else {
-            reject(new Error('用户名或密码错误'))
-          }
-        }, 1500)
-      })
     }
   },
-  mounted() {
-    // 检查是否有保存的用户名
-    if (localStorage.getItem('rememberMe') === 'true') {
-      const savedUsername = localStorage.getItem('username')
-      if (savedUsername) {
-        this.formData.username = savedUsername
-      }
-    }
-  }
 }
 </script>
 

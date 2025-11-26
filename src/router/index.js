@@ -1,11 +1,13 @@
 import { createRouter, createWebHistory } from 'vue-router'
 import HomeView from '../views/HomeView.vue'
-import Login from '../views/Login.vue'
-import Register from '../views/Register.vue'
 import CreateRoomView from '../views/CreateRoomView.vue'
 import JoinRoomView from '../views/JoinRoomView.vue'
 import StudyRoomView from '../views/StudyRoomView.vue'
 import TaskManagementView from '../views/TaskManagementView.vue'
+import Login from '@/views/Login.vue'
+import Register from '@/views/Register.vue'
+import PersonalCenter from '@/views/PersonalCenter.vue'
+
 
 const routes = [
   {
@@ -43,6 +45,11 @@ const routes = [
     path: '/task-management',
     name: 'task-management',
     component: TaskManagementView
+  },
+  {
+    path: '/personal-center',
+    name: 'PersonalCenter',
+    component: PersonalCenter
   }
 ]
 

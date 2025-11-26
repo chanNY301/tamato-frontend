@@ -242,8 +242,8 @@ export default {
     
     // 跳转到个人中心（预留）
     goToProfile() {
-      alert('个人中心功能正在开发中...')
-      // this.$router.push('/profile') // 预留跳转逻辑
+      //alert('个人中心功能正在开发中...')
+      this.$router.push('/personal-center') // 预留跳转逻辑
     },
     
     // 海报轮播方法
