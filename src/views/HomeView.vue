@@ -40,11 +40,11 @@
       <!-- 左侧小组件区域 (预留) -->
       <aside class="widgets-area">
         <div class="widget-placeholder">
-          <p>📊 学习数据</p>
+          <p>学习数据</p>
           <p>未来这里放小组件</p>
         </div>
         <div class="widget-placeholder">
-          <p>🏆 成就</p>
+          <p>成就</p>
           <p>未来这里放小组件</p>
         </div>
       </aside>
@@ -97,11 +97,11 @@
       <aside class="right-sidebar">
         <div class="sticky-buttons">
           <button class="btn-primary" @click="createRoom">
-            <span class="btn-icon">➕</span>
+            <span class="btn-icon"></span>
             创建自习室
           </button>
           <button class="btn-secondary" @click="joinRoom">
-            <span class="btn-icon">🔍</span>
+            <span class="btn-icon"></span>
             加入自习室
           </button>
         </div>

@@ -12,24 +12,23 @@
     <main class="main-content">
       <div class="create-room-header">
         <h1 class="page-title">创建自习室</h1>
-        <p class="page-subtitle">打造属于你的专属学习空间</p>
       </div>
 
       <div class="create-room-content">
         <!-- 左侧表单区域 -->
         <div class="form-section">
-          <div class="form-header">
-            <div class="form-icon">🏠</div>
-            <h2 class="section-title">基本信息</h2>
-          </div>
+          <h2 class="section-title">基本信息：</h2>
+          <br>
+          <br>
           
           <div class="form-group">
             <label class="form-label">自习室名称：</label>
             <input 
               type="text" 
-              v-model="roomForm.name" 
+              v-model="roomForm.room_name" 
               placeholder="请输入自习室名称"
               class="form-input"
+              :disabled="loading"
             >
           </div>
 
@@ -40,13 +39,14 @@
               placeholder="请输入自习室简介"
               class="form-textarea"
               rows="3"
+              :disabled="loading"
             ></textarea>
           </div>
 
           <div class="form-group">
-            <label class="form-label">自定义人数：</label>
+            <label class="form-label">最大人数：</label>
             <div class="select-wrapper">
-              <select v-model="roomForm.capacity" class="form-select">
+              <select v-model="roomForm.max_members" class="form-select" :disabled="loading">
                 <option value="1">1人</option>
                 <option value="2">2人</option>
                 <option value="3">3人</option>
@@ -57,29 +57,38 @@
               <span class="select-arrow">↓</span>
             </div>
           </div>
+
+          <!-- 新增音乐选择字段 -->
+          <div class="form-group">
+            <label class="form-label">背景音乐：</label>
+            <div class="select-wrapper">
+              <select v-model="roomForm.music_name" class="form-select" :disabled="loading">
+                <option value="无">无背景音乐</option>
+                <option value="轻音乐">轻音乐</option>
+                <option value="白噪音">白噪音</option>
+                <option value="自然声">自然声</option>
+                <option value="古典音乐">古典音乐</option>
+              </select>
+              <span class="select-arrow">↓</span>
+            </div>
+          </div>
         </div>
 
         <!-- 右侧操作按钮区域 -->
         <div class="action-section">
-          <div class="action-card">
-            <div class="action-header">
-              <div class="action-icon">⚡</div>
-              <h3 class="action-title">立即创建</h3>
-            </div>
-            <div class="button-group">
-              <button @click="createRoom" class="confirm-btn">
-                <span class="btn-icon">✅</span>
-                确认创建
-              </button>
-              <button @click="goToHome" class="cancel-btn">
-                <span class="btn-icon">🏠</span>
-                返回首页
-              </button>
-            </div>
-            <div class="action-tips">
-              <p>💡 创建后可以邀请好友一起学习</p>
-              <p>🔒 自习室信息随时可以修改</p>
-            </div>
+          <div class="button-group">
+            <button @click="createRoom" class="confirm-btn" :disabled="loading">
+              {{ loading ? '创建中...' : '确认创建' }}
+            </button>
+            <button @click="goToHome" class="cancel-btn" :disabled="loading">
+              返回首页
+            </button>
+          </div>
+          
+          <!-- 创建提示 -->
+          <div class="action-tips">
+            <p>创建后可以邀请好友一起学习</p>
+            <p>自习室信息随时可以修改</p>
           </div>
         </div>
       </div>
@@ -88,71 +97,86 @@
 </template>
 
 <script>
+import { createRoom } from '@/api/studyRooms'
+
 export default {
   name: 'CreateRoomView',
   data() {
     return {
+      loading: false,
       roomForm: {
-        name: '',
+        room_name: '',
         description: '',
-        capacity: '4'
+        max_members: '4',
+        music_name: '无',
+        // 这些字段API可能需要，但可以先给默认值
+        create_person: 'user123', // 这里需要从登录信息获取
+        current_time: Math.floor(Date.now() / 1000),
+        end_time: Math.floor(Date.now() / 1000) + 3600 // 默认1小时后结束
       }
     }
   },
   methods: {
-    async createRoom() {
-      if (!this.roomForm.name.trim()) {
+        async createRoom() {
+      // 基本表单验证
+      if (!this.roomForm.room_name.trim()) {
         alert('请输入自习室名称')
         return
       }
 
+      this.loading = true
+
       try {
-        // 这里调用创建自习室的 API
-        console.log('创建自习室:', this.roomForm)
+        // 准备测试数据 - 使用固定值避免字段缺失
+        const requestData = {
+          room_name: this.roomForm.room_name.trim(),
+          description: this.roomForm.description.trim() || '这是一个自习室',
+          max_members: parseInt(this.roomForm.max_members) || 4,
+          music_name: this.roomForm.music_name || '无',
+          create_person: 'test_user_001', // 固定测试用户ID
+          create_time: Math.floor(Date.now() / 1000)
+        }
+
+        console.log('🎯 发送Mock请求:', requestData)
         
-        // 模拟API调用
-        const createdRoom = await this.mockCreateRoomAPI()
+        const response = await createRoom(requestData)
+        console.log('✅ Mock响应:', response)
         
-        // 创建成功后跳转到自习室界面
-        this.$router.push({
-          name: 'study-room',
-          params: { roomId: createdRoom.id }
-        })
+        // Mock 测试：假设任何响应都算成功
+        if (response) {
+          // 生成一个模拟的房间ID（因为Mock可能不会返回真实ID）
+          const mockRoomId = 'MOCK_' + Math.random().toString(36).substr(2, 9).toUpperCase()
+          
+          alert(`Mock测试成功！模拟房间ID: ${mockRoomId}`)
+          
+          // 跳转到自习室页面（使用模拟ID）
+          this.$router.push({
+            name: 'study-room', 
+            params: { roomId: mockRoomId }
+          })
+        } else {
+          alert('Mock请求失败，但继续跳转测试页面流程')
+          // 即使失败也跳转，测试页面导航
+          this.$router.push({
+            name: 'study-room',
+            params: { roomId: 'test-room' }
+          })
+        }
         
       } catch (error) {
-        console.error('创建自习室失败:', error)
-        alert('创建自习室失败，请重试')
+        console.error('❌ Mock请求异常:', error)
+        alert('Mock测试遇到异常，但继续测试页面跳转')
+        
+        // 即使出错也跳转，确保页面流程可测试
+        this.$router.push({
+          name: 'study-room',
+          params: { roomId: 'error-test-room' }
+        })
+      } finally {
+        this.loading = false
       }
     },
     
-    // 模拟创建自习室的API调用
-    mockCreateRoomAPI() {
-      return new Promise((resolve) => {
-        setTimeout(() => {
-          // 生成随机房间ID
-          const roomId = this.generateRoomId()
-          resolve({
-            id: roomId,
-            name: this.roomForm.name,
-            description: this.roomForm.description,
-            capacity: this.roomForm.capacity,
-            createdTime: new Date().toISOString()
-          })
-        }, 1000)
-      })
-    },
-    
-    // 生成6位随机房间ID
-    generateRoomId() {
-      const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789'
-      let result = ''
-      for (let i = 0; i < 6; i++) {
-        result += chars.charAt(Math.floor(Math.random() * chars.length))
-      }
-      return result
-    },
-    
-    // 直接跳转到首页
     goToHome() {
       this.$router.push('/')
     }
@@ -161,6 +185,23 @@ export default {
 </script>
 
 <style scoped>
+/* 保持你原有的样式不变，只添加loading相关样式 */
+.form-input:disabled,
+.form-textarea:disabled,
+.form-select:disabled {
+  background-color: #f8f9fa;
+  cursor: not-allowed;
+  opacity: 0.7;
+}
+
+.confirm-btn:disabled,
+.cancel-btn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+  transform: none !important;
+}
+
+
 .create-room-view {
   min-height: 100vh;
   background: linear-gradient(135deg, #fefaf5 0%, #fff5eb 100%);
@@ -500,3 +541,5 @@ export default {
   }
 }
 </style>
+
+createRoom
