@@ -1,6 +1,5 @@
 <template>
   <div class="personal-center">
-    <!-- 顶部导航栏 -->
     <nav class="top-navbar">
       <div class="nav-back" @click="goBack">
         <span class="back-arrow">←</span>
@@ -10,19 +9,15 @@
       <div class="nav-placeholder"></div>
     </nav>
 
-    <!-- 主要内容区域 -->
     <div class="main-content">
-      <!-- 左侧边栏 -->
       <aside class="sidebar">
-        <!-- 用户信息 -->
         <div class="user-info">
           <div class="avatar-container">
-            <img :src="avatarImage" alt="用户头像" class="avatar" />
+            <img :src="userProfileData.avatar || avatarImage" alt="用户头像" class="avatar" />
           </div>
-          <div class="user-id">ID: {{ userId }}</div>
+          <div class="user-id">ID: {{ userProfileData.userId || '加载中...' }}</div>
         </div>
 
-        <!-- 导航菜单 -->
         <nav class="side-nav">
           <div
             v-for="item in navItems"
@@ -30,40 +25,29 @@
             :class="['nav-item', { active: activeNav === item.key }]"
             @click="switchNav(item.key)"
           >
-            <!-- <span class="nav-icon">{{ item.icon }}</span> -->
             <span class="nav-text">{{ item.text }}</span>
           </div>
         </nav>
       </aside>
 
-      <!-- 右侧内容区域 -->
       <main class="content-area">
         <div class="content-header">
           <h2>{{ currentNavText }}</h2>
+          <div v-if="loading" class="loading-indicator">数据加载中...</div>
+          <div v-if="error" class="error-indicator">{{ error }}</div>
         </div>
         
         <div class="content-body">
-          <!-- 根据当前选中的导航显示不同内容 -->
-          <div v-if="activeNav === 'profile'" class="tab-content">
-            <div class="placeholder-content">
-              <h3>个人资料</h3>
-              <p>开发中</p>
-            </div>
-          </div>
-          
-          <div v-else-if="activeNav === 'statistics'" class="tab-content">
-            <div class="placeholder-content">
-              <h3>专注统计</h3>
-              <p>开发中</p>
-            </div>
-          </div>
-          
-          <div v-else-if="activeNav === 'settings'" class="tab-content">
-            <div class="placeholder-content">
-              <h3>设置</h3>
-              <p>开发中</p>
-            </div>
-          </div>
+          <keep-alive>
+            <component 
+              :is="activeNav === 'profile' ? 'UserProfile' : 
+                   activeNav === 'statistics' ? 'UserStatistics' : 
+                   'UserSettings'"
+              :user-info="userProfileData"
+              @update-user-info="updateSidebarInfo"
+              class="tab-content" 
+            />
+          </keep-alive>
         </div>
       </main>
     </div>
@@ -72,35 +56,110 @@
 
 <script>
 import avatarImage from '@/assets/images/avatar.png'
+import UserProfile from '@/components/PersonalCenter/UserProfile.vue';
+import UserSettings from '@/components/PersonalCenter/UserSettings.vue';
+import UserStatistics from '@/components/PersonalCenter/UserStatistics.vue';
+
+const BASE_URL = 'http://127.0.0.1:4523/m1/7239915-6966518-default';
 
 export default {
   name: 'PersonalCenter',
+
+  components: {
+    UserProfile,
+    UserStatistics,
+    UserSettings
+  },
+
   data() {
     return {
       avatarImage: avatarImage,
-      userId: '100001',
       activeNav: 'profile', // 默认选中个人资料
       navItems: [
         { key: 'profile', text: '个人资料' },
         { key: 'statistics', text: '专注统计' },
         { key: 'settings', text: '设置' }
-      ]
+      ],
+      loading: false,
+      error: '',
+      userProfileData: {
+        userId: '加载中...', 
+        username: '加载中...',
+        email: '',
+        phone: '',
+        gender: '', // 对应 API 的 sex
+        birthday: '',
+        region: '', // 对应 API 的 province
+        tomatoCount: 0, // 对应 API 的 tomato
+        avatar: avatarImage, 
+        password_hash: '', 
+      }
     }
   },
   computed: {
-    // 当前选中导航的显示文本
     currentNavText() {
       const item = this.navItems.find(item => item.key === this.activeNav)
       return item ? item.text : '个人中心'
     }
   },
+  created() {
+    this.fetchUserInfo();
+  },
   methods: {
-    // 返回首页
+    // 格式化用户信息数据
+    formatUserData(data) {
+      return {
+        userId: data.user_id ? String(data.user_id) : 'N/A',
+        username: data.username || 'N/A',
+        email: data.email || '',
+        phone: data.phone || '',
+        gender: data.sex,
+        birthday: data.birthday ? String(data.birthday).replace(/(\d{4})(\d{2})(\d{2})/, '$1-$2-$3') : '',
+        region: data.province || '',
+        tomatoCount: data.tomato || 0,
+        avatar: this.avatarImage, 
+        password_hash: data.password_hash || '',
+      }
+    },
+    
+    // 从 /me 获取用户信息
+    async fetchUserInfo() {
+      // 只有在没有正在进行加载时才显示 loading，或强制显示 loading
+      if (!this.loading) {
+        this.loading = true;
+      }
+      this.error = ''
+      
+      try {
+        const response = await fetch(`${BASE_URL}/me`)
+        const result = await response.json()
+        
+        if (response.ok && result) {
+          // 确保整个 userProfileData 被最新的服务器数据覆盖
+          this.userProfileData = this.formatUserData(result)
+        } else {
+          this.error = '加载用户信息失败。'
+          console.error('API Error:', result)
+        }
+      } catch (err) {
+        this.error = '网络请求失败，请检查服务。'
+        console.error('Fetch Error:', err)
+      } finally {
+        this.loading = false
+      }
+    },
+
+    // 接收来自 UserProfile 组件的更新事件。
+    // 在子组件保存成功后被调用，用于重新获取最新数据。
+    updateSidebarInfo() {
+      // 重新调用 fetchUserInfo 来获取最新的用户信息，实现数据刷新
+      this.fetchUserInfo();
+    },
+    
     goBack() {
       this.$router.push('/')
     },
     
-    // 切换导航
     switchNav(navKey) {
       this.activeNav = navKey
     }
@@ -109,6 +168,7 @@ export default {
 </script>
 
 <style scoped>
+/* 样式保持不变 */
 .personal-center {
   min-height: 100vh;
   background-color: #f8f9fa;
@@ -132,7 +192,7 @@ export default {
   align-items: center;
   gap: 8px;
   cursor: pointer;
-  color: #cc2a1f;
+  color: #000000;
   font-weight: 500;
   padding: 8px 12px;
   border-radius: 6px;
@@ -240,12 +300,6 @@ export default {
   color: white;
 }
 
-/* .nav-icon {
-  font-size: 1.1em;
-  width: 20px;
-  text-align: center;
-} */
-
 .nav-text {
   font-weight: 500;
   text-align: center;
@@ -294,28 +348,16 @@ export default {
   }
 }
 
-.placeholder-content {
+.loading-indicator, .error-indicator {
+  padding: 10px 0;
   text-align: center;
-  color: #666;
-  max-width: 400px;
-  margin: 0 auto;
-  padding: 40px 0;
+  font-weight: 500;
 }
-
-.placeholder-content h3 {
-  margin: 0 0 12px 0;
-  color: #333;
-  font-size: 1.3em;
+.loading-indicator {
+  color: #007bff;
 }
-
-.placeholder-content p {
-  margin: 0 0 20px 0;
-  line-height: 1.5;
-}
-
-.placeholder-icon {
-  font-size: 4em;
-  opacity: 0.7;
+.error-indicator {
+  color: #cc2a1f;
 }
 
 /* 响应式设计 */
@@ -338,5 +380,12 @@ export default {
     width: 80px;
     height: 80px;
   }
+
+  .fade-enter-active, .fade-leave-active {
+  transition: opacity 0.2s ease;
+}
+.fade-enter, .fade-leave-to {
+  opacity: 0;
+}
 }
 </style>
