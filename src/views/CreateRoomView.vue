@@ -108,17 +108,12 @@ export default {
         room_name: '',
         description: '',
         max_members: '4',
-        music_name: '无',
-        // 这些字段API可能需要，但可以先给默认值
-        create_person: 'user123', // 这里需要从登录信息获取
-        current_time: Math.floor(Date.now() / 1000),
-        end_time: Math.floor(Date.now() / 1000) + 3600 // 默认1小时后结束
+        music_name: '无'
       }
     }
   },
   methods: {
-        async createRoom() {
-      // 基本表单验证
+    async createRoom() {
       if (!this.roomForm.room_name.trim()) {
         alert('请输入自习室名称')
         return
@@ -127,51 +122,34 @@ export default {
       this.loading = true
 
       try {
-        // 准备测试数据 - 使用固定值避免字段缺失
+        // 使用前端表单数据，但保持成功的字段结构
         const requestData = {
+          room_id: 'R' + Date.now().toString().slice(-6), // 基于时间生成唯一ID
           room_name: this.roomForm.room_name.trim(),
-          description: this.roomForm.description.trim() || '这是一个自习室',
-          max_members: parseInt(this.roomForm.max_members) || 4,
-          music_name: this.roomForm.music_name || '无',
-          create_person: 'test_user_001', // 固定测试用户ID
-          create_time: Math.floor(Date.now() / 1000)
+          create_person: 'user_123', // 保持成功的值
+          max_members: parseInt(this.roomForm.max_members),
+          current_time: Math.floor(Date.now() / 1000),
+          end_time: Math.floor(Date.now() / 1000) + 7200,
+          music_name: this.roomForm.music_name
         }
 
-        console.log('🎯 发送Mock请求:', requestData)
+        console.log('发送请求:', requestData)
         
         const response = await createRoom(requestData)
-        console.log('✅ Mock响应:', response)
+        console.log('响应结果:', response)
         
-        // Mock 测试：假设任何响应都算成功
-        if (response) {
-          // 生成一个模拟的房间ID（因为Mock可能不会返回真实ID）
-          const mockRoomId = 'MOCK_' + Math.random().toString(36).substr(2, 9).toUpperCase()
-          
-          alert(`Mock测试成功！模拟房间ID: ${mockRoomId}`)
-          
-          // 跳转到自习室页面（使用模拟ID）
-          this.$router.push({
-            name: 'study-room', 
-            params: { roomId: mockRoomId }
-          })
-        } else {
-          alert('Mock请求失败，但继续跳转测试页面流程')
-          // 即使失败也跳转，测试页面导航
-          this.$router.push({
-            name: 'study-room',
-            params: { roomId: 'test-room' }
-          })
-        }
+        // 使用请求中的room_id跳转
+        const roomId = requestData.room_id
+        alert(`自习室创建成功！房间ID: ${roomId}`)
+        
+        this.$router.push({
+          name: 'study-room', 
+          params: { roomId: roomId }
+        })
         
       } catch (error) {
-        console.error('❌ Mock请求异常:', error)
-        alert('Mock测试遇到异常，但继续测试页面跳转')
-        
-        // 即使出错也跳转，确保页面流程可测试
-        this.$router.push({
-          name: 'study-room',
-          params: { roomId: 'error-test-room' }
-        })
+        console.error('请求异常:', error)
+        alert('创建失败，请检查网络连接')
       } finally {
         this.loading = false
       }
@@ -541,5 +519,3 @@ export default {
   }
 }
 </style>
-
-createRoom
