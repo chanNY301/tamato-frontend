@@ -122,7 +122,7 @@ export default {
       }
     },
     
-    // 从 /me 获取用户信息
+    // 从 /user/me 获取用户信息
     async fetchUserInfo() {
       // 只有在没有正在进行加载时才显示 loading，或强制显示 loading
       if (!this.loading) {
@@ -131,7 +131,7 @@ export default {
       this.error = ''
       
       try {
-        const response = await fetch(`${BASE_URL}/me`)
+        const response = await fetch(`${BASE_URL}/user/me`)
         const result = await response.json()
         
         if (response.ok && result) {
