@@ -104,7 +104,6 @@ export default {
 
         if (result.code === 200) {
           // 登录成功，跳转到首页
-          console.log('登录成功，跳转中')
           setTimeout(() => {
             this.$router.push('/')
           }, 800)
@@ -128,7 +127,7 @@ export default {
   display: flex;
   align-items: center;
   justify-content: center;
-  background: linear-gradient(135deg, #eeaa67 0%, #ffd7b4 100%);
+  background: linear-gradient(135deg, #ffffff 0%, #ffd7b4 100%);
   padding: 1rem;
 }
 
