@@ -1,0 +1,367 @@
+<template>
+  <div class="task-sidebar">
+    <div class="sidebar-header">
+      <h3 class="sidebar-title">待办任务</h3>
+      <button @click="toggleCollapsed" class="collapse-btn">
+        {{ isCollapsed ? '展开' : '收起' }}
+      </button>
+    </div>
+    
+    <div v-if="!isCollapsed" class="sidebar-content">
+      <!-- 任务列表 -->
+      <div class="task-list">
+        <div 
+          v-for="task in pendingTasks" 
+          :key="task.task_id"
+          class="task-item"
+          :class="{ 'active': task.status === '进行中' }"
+          @click="toggleTaskStatus(task)"
+        >
+          <div class="task-item-main">
+            <div class="task-item-header">
+              <span class="task-name">{{ task.task_name }}</span>
+              <span class="task-duration">{{ task.duration }}分钟</span>
+            </div>
+            <div class="task-item-footer">
+              <span class="task-status">{{ getStatusText(task.status) }}</span>
+              <span class="task-time">{{ formatTime(task.created_at) }}</span>
+            </div>
+          </div>
+        </div>
+      </div>
+      
+      <!-- 空状态 -->
+      <div v-if="pendingTasks.length === 0" class="empty-tasks">
+        <p>暂无待办任务</p>
+        <button @click="goToTaskManagement" class="create-task-btn">
+          去创建任务
+        </button>
+      </div>
+      
+      <!-- 底部统计 -->
+      <div class="sidebar-footer">
+        <div class="task-stats">
+          <span>共 {{ totalTasks }} 个任务</span>
+          <span>{{ completedTasks }} 个已完成</span>
+        </div>
+        <button @click="refreshTasks" class="refresh-btn" :disabled="loading">
+          {{ loading ? '刷新中...' : '刷新' }}
+        </button>
+      </div>
+    </div>
+  </div>
+</template>
+
+<script>
+import { getTasks, updateTask } from '@/api/tasks'
+
+export default {
+  name: 'TaskSidebar',
+  props: {
+    // 可以从父组件传入初始状态
+    initiallyCollapsed: {
+      type: Boolean,
+      default: false
+    }
+  },
+  data() {
+    return {
+      tasks: [],
+      loading: false,
+      isCollapsed: this.initiallyCollapsed
+    }
+  },
+  computed: {
+    // 未完成的任务（包括进行中和未完成）
+    pendingTasks() {
+      return this.tasks.filter(task => 
+        task.status === '未完成' || task.status === '进行中'
+      )
+    },
+    totalTasks() {
+      return this.tasks.length
+    },
+    completedTasks() {
+      return this.tasks.filter(task => task.status === '已完成').length
+    }
+  },
+  mounted() {
+    this.loadTasks()
+    // 可选：定时刷新任务列表
+    // this.refreshInterval = setInterval(this.loadTasks, 60000) // 每分钟刷新一次
+  },
+  beforeUnmount() {
+    // if (this.refreshInterval) {
+    //   clearInterval(this.refreshInterval)
+    // }
+  },
+  methods: {
+    async loadTasks() {
+      try {
+        this.loading = true
+        const response = await getTasks()
+        if (response && response.data) {
+          this.tasks = response.data
+        }
+      } catch (error) {
+        console.error('加载任务失败:', error)
+      } finally {
+        this.loading = false
+      }
+    },
+
+    async toggleTaskStatus(task) {
+      try {
+        let newStatus
+        if (task.status === '未完成') {
+          newStatus = '进行中'
+        } else if (task.status === '进行中') {
+          newStatus = '已完成'
+        } else {
+          newStatus = '未完成'
+        }
+
+        await updateTask(task.task_id, {
+          ...task,
+          status: newStatus
+        })
+        
+        // 重新加载任务列表
+        await this.loadTasks()
+        
+        // 触发事件通知父组件
+        this.$emit('task-status-changed', {
+          taskId: task.task_id,
+          newStatus: newStatus
+        })
+      } catch (error) {
+        console.error('更新任务状态失败:', error)
+      }
+    },
+
+    getStatusText(status) {
+      const statusMap = {
+        '未完成': '未开始',
+        '进行中': '进行中',
+        '已完成': '已完成'
+      }
+      return statusMap[status] || status
+    },
+
+    formatTime(timeStr) {
+      if (!timeStr) return '-'
+      const date = new Date(timeStr)
+      return `${date.getMonth() + 1}/${date.getDate()}`
+    },
+
+    toggleCollapsed() {
+      this.isCollapsed = !this.isCollapsed
+      this.$emit('toggle-collapsed', this.isCollapsed)
+    },
+
+    refreshTasks() {
+      this.loadTasks()
+    },
+
+    goToTaskManagement() {
+      this.$router.push('/task-management')
+    }
+  }
+}
+</script>
+
+<style scoped>
+.task-sidebar {
+  width: 100%;
+  background: white;
+  border: 1px solid #e9ecef;
+  border-radius: 12px;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  max-height: 500px; /* 添加最大高度 */
+}
+
+.sidebar-header {
+  padding: 20px;
+  border-bottom: 1px solid #e9ecef;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.sidebar-title {
+  margin: 0;
+  font-size: 1.2em;
+  color: #333;
+  font-weight: 600;
+}
+
+.collapse-btn {
+  padding: 6px 12px;
+  border: 1px solid #e0e0e0;
+  background: white;
+  border-radius: 6px;
+  font-size: 0.85em;
+  cursor: pointer;
+  color: #666;
+  transition: all 0.2s ease;
+}
+
+.collapse-btn:hover {
+  background: #f8f9fa;
+  border-color: #eeaa67;
+  color: #eeaa67;
+}
+
+.sidebar-content {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.task-list {
+  flex: 1;
+  overflow-y: auto;
+  padding: 15px;
+}
+
+.task-item {
+  background: white;
+  border: 1px solid #e9ecef;
+  border-radius: 8px;
+  padding: 12px;
+  margin-bottom: 10px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.task-item:hover {
+  border-color: #eeaa67;
+  transform: translateX(-2px);
+}
+
+.task-item.active {
+  border-left: 4px solid #eeaa67;
+  background: #fff9f2;
+}
+
+.task-item-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  margin-bottom: 8px;
+}
+
+.task-name {
+  font-weight: 500;
+  color: #333;
+  flex: 1;
+  font-size: 0.95em;
+  line-height: 1.4;
+}
+
+.task-duration {
+  font-size: 0.8em;
+  color: #eeaa67;
+  font-weight: 500;
+  margin-left: 8px;
+}
+
+.task-item-footer {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 0.8em;
+}
+
+.task-status {
+  padding: 2px 8px;
+  border-radius: 10px;
+  background: #f8f9fa;
+  color: #666;
+}
+
+.task-item.active .task-status {
+  background: #fff9f2;
+  color: #eeaa67;
+}
+
+.task-time {
+  color: #999;
+}
+
+.empty-tasks {
+  text-align: center;
+  padding: 30px 15px;
+  color: #666;
+}
+
+.empty-tasks p {
+  margin: 0 0 15px 0;
+}
+
+.create-task-btn {
+  background: #eeaa67;
+  color: white;
+  border: none;
+  padding: 8px 16px;
+  border-radius: 6px;
+  font-size: 0.9em;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.create-task-btn:hover {
+  background: #e69c55;
+}
+
+.sidebar-footer {
+  padding: 15px;
+  border-top: 1px solid #e9ecef;
+  background: #f8f9fa;
+}
+
+.task-stats {
+  display: flex;
+  justify-content: space-between;
+  margin-bottom: 10px;
+  font-size: 0.85em;
+  color: #666;
+}
+
+.refresh-btn {
+  width: 100%;
+  padding: 8px;
+  border: 1px solid #e0e0e0;
+  background: white;
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 0.9em;
+  color: #666;
+  transition: all 0.2s ease;
+}
+
+.refresh-btn:hover:not(:disabled) {
+  background: #f0f0f0;
+  border-color: #eeaa67;
+  color: #eeaa67;
+}
+
+.refresh-btn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+/* 响应式设计 */
+@media (max-width: 768px) {
+  .task-sidebar {
+    width: 100%;
+    height: auto;
+    position: relative;
+    border-left: none;
+    border-top: 1px solid #e9ecef;
+  }
+}
+</style>
