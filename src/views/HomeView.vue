@@ -74,22 +74,12 @@
 
         <!-- 快速加入区域 - 现在可以滚动 -->
         <div class="quick-join">
-          <h3>快速加入</h3>
-          <div class="quick-join-list" ref="quickJoinList">
-            <!-- 快速加入的项目列表 -->
-            <div 
-              v-for="room in quickJoinRooms" 
-              :key="room.id" 
-              class="quick-join-item"
-            >
-              <div class="room-avatar">○</div>
-              <div class="room-info">
-                <div class="room-name">{{ room.name }}</div>
-                <div class="room-stats">{{ room.members }}人 · {{ room.status }}</div>
-              </div>
-              <button class="join-btn" @click="quickJoin(room.id)">加入</button>
-            </div>
-          </div>
+          <QuickJoin 
+            :limit="5" 
+            :auto-refresh="true"
+            :refresh-interval="60000"
+            @join-room="handleJoinRoom"
+          />
         </div>
       </section>
 
@@ -106,10 +96,7 @@
           </button>
         </div>
         
-        <div class="sidebar-placeholder">
-          <p>右侧边栏</p>
-          <p>未来这里可以放其他功能</p>
-        </div>
+        <TaskSidebar @task-status-changed="handleTaskStatusChange" />
       </aside>
     </main>
   </div>
@@ -118,9 +105,18 @@
 <script>
 // 只导入头像，海报改为动态导入
 import avatarImage from '@/assets/images/avatar.png'
+// 添加这一行导入任务侧边栏组件
+import TaskSidebar from '@/components/TaskSidebar/TaskSidebar.vue'
+// 导入快速加入组件
+import QuickJoin from '@/components/QuickJoin/QuickJoin.vue'
 
 export default {
   name: 'HomeView',
+  components: {
+    // 在这里注册组件
+    TaskSidebar,
+    QuickJoin
+  },
   data() {
     return {
       // 使用导入的图片
@@ -272,6 +268,21 @@ export default {
     
     quickJoin(roomId) {
       alert(`快速加入房间 ${roomId} - 功能待实现`)
+    },
+
+    handleTaskStatusChange(data) {
+      console.log('任务状态改变:', data)
+      // 可以在这里处理任务状态改变的逻辑
+      // 例如：显示提示、更新其他数据等
+    },
+
+    handleJoinRoom(roomId) {
+      console.log('加入房间:', roomId)
+      // 跳转到自习室页面
+      this.$router.push({
+        name: 'study-room',
+        params: { roomId: roomId }
+      })
     }
   }
 }
