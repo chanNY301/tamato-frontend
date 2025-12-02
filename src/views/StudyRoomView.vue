@@ -115,40 +115,17 @@
           </div>
         </div>
 
-        <!-- 中间：番茄钟学习组件预留位置 -->
-        <div class="study-tools-section">
-          <div class="tools-header">
-            <h2 class="tools-title">学习工具</h2>
-          </div>
-          
-          <!-- 番茄钟组件预留位置 -->
-          <div class="tomato-timer-placeholder">
-            <div class="placeholder-content">
-              <h3>番茄钟学习法</h3>
-              <p>专注25分钟，休息5分钟</p>
-              <div class="timer-controls">
-                <button 
-                  v-if="!userStatus.isFocusing"
-                  @click="startTomatoTimer"
-                  class="tomato-btn start-tomato"
-                >
-                  开始专注
-                </button>
-                <button 
-                  v-else
-                  @click="stopTomatoTimer"
-                  class="tomato-btn stop-tomato"
-                >
-                  结束专注
-                </button>
-              </div>
-            </div>
-          </div>
-          
-          <!-- 其他学习工具预留位置 -->
-          <div class="other-tools-placeholder">
-            <p>其他学习工具开发中...</p>
-          </div>
+        <!-- 中间：番茄钟组件 -->
+        <div class="study-center-section">
+          <PomodoroTimer 
+            :active="userStatus.isFocusing"
+            @timer-started="handleTimerStart"
+            @timer-paused="handleTimerPause"
+            @timer-resumed="handleTimerResume"
+            @timer-stopped="handleTimerStop"
+            @focus-completed="handleFocusCompleted"
+            @break-skipped="handleBreakSkipped"
+          />
         </div>
 
         <!-- 右侧：操作按钮区域 -->
@@ -205,10 +182,14 @@
 </template>
 
 <script>
-import { getRoomDetail, leaveRoom } from '@/api/studyRooms'
+import { getRoomDetail, leaveRoom, updateUserStatus } from '@/api/studyRooms'
+import PomodoroTimer from '@/components/PomodoroTimer/PomodoroTimer.vue'
 
 export default {
   name: 'StudyRoomView',
+  components: {
+    PomodoroTimer
+  },
   data() {
     return {
       roomInfo: {
@@ -226,11 +207,13 @@ export default {
         focusStartTime: null
       },
       members: [],
-      focusTimer: null,
       loading: true,
-      updateInterval: null,
       showSettings: false,
-      isRoomOwner: false
+      isRoomOwner: false,
+      // 添加状态变化标识
+      statusChanged: false,
+      // 移除 updateInterval 定时器
+      lastRefreshTime: null
     }
   },
   computed: {
@@ -246,7 +229,16 @@ export default {
   },
   async mounted() {
     await this.loadRoomData()
-    this.updateInterval = setInterval(this.loadRoomData, 30000)
+    // 移除定时刷新
+  },
+  // 添加监视器，在状态变化时刷新
+  watch: {
+    'userStatus.isFocusing'(newVal, oldVal) {
+      if (newVal !== oldVal) {
+        this.statusChanged = true
+        this.refreshRoomData()
+      }
+    }
   },
   methods: {
     async loadRoomData() {
@@ -268,6 +260,49 @@ export default {
         this.setDefaultRoomInfo()
       } finally {
         this.loading = false
+        this.lastRefreshTime = Date.now()
+      }
+    },
+
+    // 状态变化时刷新数据
+    async refreshRoomData() {
+      try {
+        console.log('用户状态变化，刷新房间数据...')
+        
+        // 更新用户状态到服务器
+        await this.updateStatusToServer()
+        
+        // 重新加载房间数据
+        const response = await getRoomDetail(this.roomId)
+        
+        if (response.code === 200 && response.data) {
+          this.roomInfo = { ...response.data }
+          this.loadMembersData()
+          console.log('房间数据刷新成功')
+        }
+        
+      } catch (error) {
+        console.error('刷新房间数据时出错:', error)
+      } finally {
+        this.statusChanged = false
+      }
+    },
+
+    // 更新用户状态到服务器
+    async updateStatusToServer() {
+      try {
+        const status = this.userStatus.isFocusing ? 'focusing' : 'resting'
+        const response = await updateUserStatus({
+          roomId: this.roomId,
+          status: status,
+          focusTime: this.userStatus.focusTime
+        })
+        
+        if (response.code === 200) {
+          console.log('用户状态更新成功:', status)
+        }
+      } catch (error) {
+        console.error('更新用户状态失败:', error)
       }
     },
 
@@ -287,29 +322,66 @@ export default {
     },
 
     loadMembersData() {
-      this.members = [
-        { 
-          id: 1, 
-          name: this.roomInfo.create_person, 
-          avatar: '',
-          status: 'focusing', 
-          focusTime: '01:23:45' 
-        },
-        { 
-          id: 2, 
-          name: '学习伙伴A', 
-          avatar: '',
-          status: 'focusing', 
-          focusTime: '00:45:30' 
-        },
-        { 
-          id: 3, 
-          name: '学习伙伴B', 
-          avatar: '',
-          status: 'resting', 
-          restTime: '休息中' 
-        }
-      ]
+      // 如果用户状态已变化，更新当前用户状态
+      if (this.statusChanged) {
+        const currentUserStatus = this.userStatus.isFocusing ? 'focusing' : 'resting'
+        
+        this.members = [
+          { 
+            id: 0, 
+            name: '我', 
+            avatar: '',
+            status: currentUserStatus,
+            focusTime: currentUserStatus === 'focusing' ? '进行中' : '',
+            restTime: currentUserStatus === 'resting' ? '休息中' : ''
+          },
+          { 
+            id: 1, 
+            name: this.roomInfo.create_person, 
+            avatar: '',
+            status: 'focusing', 
+            focusTime: '01:23:45' 
+          },
+          { 
+            id: 2, 
+            name: '学习伙伴A', 
+            avatar: '',
+            status: 'focusing', 
+            focusTime: '00:45:30' 
+          },
+          { 
+            id: 3, 
+            name: '学习伙伴B', 
+            avatar: '',
+            status: 'resting', 
+            restTime: '休息中' 
+          }
+        ]
+      } else {
+        this.members = [
+          { 
+            id: 1, 
+            name: this.roomInfo.create_person, 
+            avatar: '',
+            status: 'focusing', 
+            focusTime: '01:23:45' 
+          },
+          { 
+            id: 2, 
+            name: '学习伙伴A', 
+            avatar: '',
+            status: 'focusing', 
+            focusTime: '00:45:30' 
+          },
+          { 
+            id: 3, 
+            name: '学习伙伴B', 
+            avatar: '',
+            status: 'resting', 
+            restTime: '休息中' 
+          }
+        ]
+      }
     },
 
     getInitials(name) {
@@ -317,14 +389,46 @@ export default {
       return name.charAt(0).toUpperCase()
     },
 
-    startTomatoTimer() {
+    // 番茄钟事件处理方法
+    handleTimerStart() {
+      console.log('番茄钟开始')
       this.userStatus.isFocusing = true
       this.updateCurrentUserStatus('focusing')
+      // 状态变化会自动触发 watch，不需要手动调用 refreshRoomData
     },
     
-    stopTomatoTimer() {
+    handleTimerPause() {
+      console.log('番茄钟暂停')
+      // 如果需要，可以在这里处理暂停状态
+    },
+    
+    handleTimerResume() {
+      console.log('番茄钟继续')
+      this.userStatus.isFocusing = true
+      // 状态变化会自动触发 watch
+    },
+    
+    handleTimerStop() {
+      console.log('番茄钟停止')
       this.userStatus.isFocusing = false
       this.updateCurrentUserStatus('resting')
+      // 状态变化会自动触发 watch
+    },
+    
+    handleFocusCompleted(sessions) {
+      console.log(`专注完成，已完成 ${sessions} 个番茄`)
+      // 完成专注后自动进入休息状态
+      setTimeout(() => {
+        this.userStatus.isFocusing = false
+        this.updateCurrentUserStatus('resting')
+      }, 1000)
+    },
+    
+    handleBreakSkipped() {
+      console.log('休息被跳过')
+      // 跳过休息，直接开始下一个专注
+      this.userStatus.isFocusing = true
+      this.updateCurrentUserStatus('focusing')
     },
 
     updateCurrentUserStatus(status) {
@@ -363,20 +467,17 @@ export default {
     },
 
     async leaveRoom() {
-      // 确认对话框
       const userConfirmed = confirm('确定要退出自习室吗？')
       if (!userConfirmed) {
-        return // 用户取消，不执行任何操作
+        return
       }
 
       try {
         console.log('正在退出房间...', this.roomId)
         
-        // 调用退出房间API
         const response = await leaveRoom(this.roomId)
         console.log('退出房间API响应:', response)
         
-        // 无论API返回什么状态，都执行跳转
         if (response && response.code === 200) {
           console.log('退出房间成功')
         } else {
@@ -385,9 +486,7 @@ export default {
         
       } catch (error) {
         console.error('退出房间请求失败:', error)
-        // 即使请求失败也继续跳转
       } finally {
-        // 确保无论如何都跳转到首页
         this.goToHome()
       }
     },
@@ -398,9 +497,7 @@ export default {
     }
   },
   beforeUnmount() {
-    if (this.updateInterval) {
-      clearInterval(this.updateInterval)
-    }
+    // 移除组件时不需要清理定时器，因为已经移除了
   }
 }
 </script>
