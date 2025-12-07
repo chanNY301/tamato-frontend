@@ -198,14 +198,19 @@ export default {
         task_name: '',
         task_note: '',
         duration: 25,
-        user_id: 1 // 从用户系统获取
+        user_id: 1
       },
       statusTabs: [
         { label: '全部', value: 'all' },
-        { label: '未完成', value: '未完成' },
+        { label: '未开始', value: '未开始' },
         { label: '进行中', value: '进行中' },
         { label: '已完成', value: '已完成' }
-      ]
+      ],
+      pagination: {
+        total: 0,
+        current_page: 1,
+        total_pages: 1
+      }
     }
   },
   computed: {
@@ -223,6 +228,9 @@ export default {
     },
     inProgressTasks() {
       return this.tasks.filter(task => task.status === '进行中').length
+    },
+    notStartedTasks() {
+      return this.tasks.filter(task => task.status === '未开始').length
     }
   },
   async mounted() {
@@ -235,13 +243,42 @@ export default {
         const response = await getTasks()
         console.log('获取任务列表响应:', response)
         
-        if (response.code === 200) {
-          this.tasks = response.data || []
+        // 处理API响应
+        if (response && response.data) {
+          // 如果响应有code字段（通常API返回的结构）
+          if (response.code === 200 || response.success) {
+            const responseData = response.data
+            
+            // 提取任务数组
+            if (Array.isArray(responseData.data)) {
+              this.tasks = responseData.data
+            } else if (Array.isArray(responseData)) {
+              this.tasks = responseData
+            } else {
+              this.tasks = []
+            }
+            
+            // 提取分页信息
+            if (responseData.total !== undefined) {
+              this.pagination = {
+                total: responseData.total,
+                current_page: responseData.current_page || 1,
+                total_pages: responseData.total_pages || 1
+              }
+            }
+          } else {
+            console.error('API返回错误:', response.message)
+            this.tasks = []
+          }
         } else {
-          console.error('获取任务失败:', response.message)
+          // 如果没有data字段，尝试直接使用响应
+          this.tasks = Array.isArray(response) ? response : []
         }
+        
+        console.log('任务数据:', this.tasks)
       } catch (error) {
         console.error('加载任务失败:', error)
+        this.tasks = []
       } finally {
         this.loading = false
       }
@@ -254,7 +291,7 @@ export default {
 
     getTaskStatusClass(status) {
       return {
-        'task-not-started': status === '未完成',
+        'task-not-started': status === '未开始',
         'task-in-progress': status === '进行中',
         'task-completed': status === '已完成'
       }
@@ -262,44 +299,53 @@ export default {
 
     getStatusTagClass(status) {
       return {
-        'tag-not-started': status === '未完成',
+        'tag-not-started': status === '未开始',
         'tag-in-progress': status === '进行中',
         'tag-completed': status === '已完成'
       }
     },
 
     getStatusText(status) {
-      const statusMap = {
-        '未完成': '未开始',
-        '进行中': '进行中',
-        '已完成': '已完成'
-      }
-      return statusMap[status] || status
+      return status
     },
 
     formatTime(timeStr) {
       if (!timeStr) return '-'
-      return new Date(timeStr).toLocaleDateString()
+      try {
+        const date = new Date(timeStr)
+        return date.toLocaleDateString('zh-CN', {
+          month: '2-digit',
+          day: '2-digit'
+        })
+      } catch (error) {
+        return timeStr
+      }
     },
 
     async submitTask() {
       try {
-        if (this.editingTask) {
-          // 更新任务
-          const response = await updateTask(this.editingTask.task_id, {
-            ...this.taskForm,
-            task_id: this.editingTask.task_id,
-            user_id: this.editingTask.user_id
-          })
-          console.log('更新任务响应:', response)
-        } else {
-          // 创建任务
-          const response = await createTask(this.taskForm)
-          console.log('创建任务响应:', response)
+        const taskData = {
+          task_name: this.taskForm.task_name,
+          task_note: this.taskForm.task_note,
+          duration: this.taskForm.duration,
+          user_id: this.taskForm.user_id
         }
         
+        let response
+        if (this.editingTask) {
+          // 更新任务
+          response = await updateTask(this.editingTask.task_id, taskData)
+        } else {
+          // 创建任务
+          response = await createTask(taskData)
+        }
+        
+        console.log('任务操作响应:', response)
+        
+        // 操作成功后重新加载数据
         this.closeModal()
-        await this.loadTasks() // 重新加载任务列表
+        await this.loadTasks()
+        
       } catch (error) {
         console.error('操作任务失败:', error)
         alert('操作失败，请重试')
@@ -320,8 +366,7 @@ export default {
       if (!confirm('确定要删除这个任务吗？')) return
       
       try {
-        const response = await deleteTask(taskId)
-        console.log('删除任务响应:', response)
+        await deleteTask(taskId)
         await this.loadTasks()
       } catch (error) {
         console.error('删除任务失败:', error)
@@ -332,7 +377,7 @@ export default {
     async toggleTaskStatus(task) {
       try {
         let newStatus
-        if (task.status === '未完成') {
+        if (task.status === '未开始') {
           newStatus = '进行中'
         } else if (task.status === '进行中') {
           newStatus = '已完成'
@@ -340,11 +385,11 @@ export default {
           return
         }
 
-        const response = await updateTask(task.task_id, {
+        await updateTask(task.task_id, {
           ...task,
           status: newStatus
         })
-        console.log('更新状态响应:', response)
+        
         await this.loadTasks()
       } catch (error) {
         console.error('更新任务状态失败:', error)

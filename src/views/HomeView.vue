@@ -72,12 +72,11 @@
           </div>
         </div>
 
-        <!-- 快速加入区域 - 现在可以滚动 -->
-        <div class="quick-join">
+        <!-- 快速加入区域 - 直接嵌入 QuickJoin 组件 -->
+        <div class="quick-join-container">
           <QuickJoin 
-            :limit="5" 
-            :auto-refresh="true"
-            :refresh-interval="60000"
+            :rooms-per-page="4"
+            :auto-refresh="false"
             @join-room="handleJoinRoom"
           />
         </div>

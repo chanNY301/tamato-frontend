@@ -1,6 +1,6 @@
 import request from './request'
 
-const BASE_URL = 'https://m1.apifoxmock.com/m1/7239915-6966518-default'
+const BASE_URL = 'http://127.0.0.1:4523/m1/7239915-6966518-default'
 
 // 获取自习室列表
 export const getRoomsList = () => {
