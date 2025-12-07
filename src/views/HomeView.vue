@@ -1,6 +1,5 @@
 <template>
   <div class="home-container">
-    <!-- 顶部导航栏 -->
     <nav class="navbar">
       <div class="nav-brand">Tomato</div>
       <div class="nav-links">
@@ -16,7 +15,6 @@
         >
           <img :src="avatarImage" alt="用户头像" />
         </div>
-        <!-- 下拉菜单 - 独立元素 -->
         <div 
           v-show="showDropdown" 
           class="dropdown-menu"
@@ -35,33 +33,19 @@
       </div>
     </nav>
 
-    <!-- 主要内容网格区域 -->
     <main class="main-grid">
-      <!-- 左侧小组件区域 (预留) -->
-      <aside class="widgets-area">
-        <div class="widget-placeholder">
-          <p>学习数据</p>
-          <p>未来这里放小组件</p>
-        </div>
-        <div class="widget-placeholder">
-          <p>成就</p>
-          <p>未来这里放小组件</p>
-        </div>
+      <aside class="friends-list-area">
+        <FriendList />
       </aside>
 
-      <!-- 中央内容区域 -->
       <section class="content-area">
-        <!-- 海报轮播区 -->
         <div class="poster-carousel">
           <div class="poster-slide">
-            <!-- 修改这里：使用动态绑定的海报图片 -->
             <img :src="currentPoster" alt="宣传海报" class="poster-image" />
           </div>
-          <!-- 轮播箭头 -->
           <button class="carousel-arrow left-arrow" @click="prevPoster">‹</button>
           <button class="carousel-arrow right-arrow" @click="nextPoster">›</button>
           
-          <!-- 新增：海报指示器（小圆点） -->
           <div class="carousel-indicators">
             <span 
               v-for="(poster, index) in posters" 
@@ -82,7 +66,6 @@
         </div>
       </section>
 
-      <!-- 右侧边栏 - 固定位置的重要按钮 -->
       <aside class="right-sidebar">
         <div class="sticky-buttons">
           <button class="btn-primary" @click="createRoom">
@@ -104,15 +87,18 @@
 <script>
 // 只导入头像，海报改为动态导入
 import avatarImage from '@/assets/images/avatar.png'
-// 添加这一行导入任务侧边栏组件
+// 添加任务侧边栏组件
 import TaskSidebar from '@/components/TaskSidebar/TaskSidebar.vue'
 // 导入快速加入组件
 import QuickJoin from '@/components/QuickJoin/QuickJoin.vue'
+// 【新增】导入 FriendList 组件
+import FriendList from '@/components/FriendList/FriendList.vue'
 
 export default {
   name: 'HomeView',
   components: {
-    // 在这里注册组件
+    // 【新增】注册 FriendList 组件
+    FriendList,
     TaskSidebar,
     QuickJoin
   },
@@ -294,7 +280,7 @@ export default {
   background-color: #fefaf5; /* 浅橘黄色背景 */
 }
 
-/* 顶部导航栏 */
+/* 顶部导航栏 (保持不变) */
 .navbar {
   display: flex;
   justify-content: space-between;
@@ -342,17 +328,36 @@ export default {
   background-color: #fff5eb; /* 浅橘黄色悬停背景 */
 }
 
-/* 小组件区域 */
-.widget-placeholder {
-  background: white;
+/* ============================
+   主要内容网格区域 (修改 grid-template-columns)
+   ============================ */
+.main-grid {
+  display: grid;
+  /* 调整列宽：左侧好友列表 280px，中央内容 1fr，右侧边栏 300px */
+  grid-template-columns: 280px 1fr 300px; 
+  gap: 20px;
   padding: 20px;
-  border-radius: 10px;
-  box-shadow: 0 2px 4px rgba(238, 170, 103, 0.1); /* 橘黄色阴影 */
-  text-align: center;
-  border: 1px solid #ffe4cc; /* 橘黄色边框 */
+  max-width: 1400px;
+  margin: 0 auto;
 }
 
-/* 海报轮播 */
+/* ============================
+   左侧好友列表区域 (原 widgets-area)
+   ============================ */
+/* 统一类名并去除原有占位符样式 */
+.friends-list-area { 
+  /* 继承 FriendList.vue 中的样式 */
+  display: flex;
+  flex-direction: column;
+  gap: 15px;
+  height: fit-content;
+  position: sticky;
+  top: 100px;
+}
+
+/* 移除原有的 widget-placeholder 样式，现在由 FriendList 组件内部处理 */
+
+/* 海报轮播 (保持不变) */
 .poster-carousel {
   position: relative;
   background: white;
@@ -370,7 +375,7 @@ export default {
   background: linear-gradient(135deg, #fef6f0 0%, #ffe4cc 100%); /* 橘黄色渐变背景 */
 }
 
-/* 快速加入区域 */
+/* 快速加入区域 (保持不变) */
 .quick-join {
   background: white;
   padding: 20px;
@@ -379,32 +384,7 @@ export default {
   border: 1px solid #ffe4cc; /* 橘黄色边框 */
 }
 
-.quick-join h3 {
-  margin: 0 0 15px 0;
-  color: #333;
-}
-
-.quick-join-item:hover {
-  border-color: #eeaa67; /* 橘黄色边框 */
-  background: #fffaf5; /* 浅橘黄色背景 */
-}
-
-.join-btn {
-  padding: 6px 12px;
-  background: #eeaa67; /* 橘黄色按钮 */
-  color: white;
-  border: none;
-  border-radius: 6px;
-  cursor: pointer;
-  font-size: 0.9em;
-  transition: background-color 0.2s;
-}
-
-.join-btn:hover {
-  background: #e69c55; /* 深橘黄色 */
-}
-
-/* 右侧边栏按钮 */
+/* 右侧边栏按钮 (保持不变) */
 .btn-primary {
   background: linear-gradient(135deg, #eeaa67, #f5b877); /* 橘黄色渐变 */
   color: white;
@@ -435,7 +415,9 @@ export default {
   border: 1px solid #ffe4cc; /* 橘黄色边框 */
 }
 
-/* 其他样式保持不变 */
+/* 其他样式保持不变 (确保没有多余的旧样式残留) */
+/* ... (原 HomeView.vue 中的其他样式保持不变) ... */
+
 .user-avatar-container {
   position: relative;
 }
@@ -495,21 +477,6 @@ export default {
 .dropdown-icon {
   margin-right: 10px;
   font-size: 1.1em;
-}
-
-.main-grid {
-  display: grid;
-  grid-template-columns: 250px 1fr 300px;
-  gap: 20px;
-  padding: 20px;
-  max-width: 1400px;
-  margin: 0 auto;
-}
-
-.widgets-area {
-  display: flex;
-  flex-direction: column;
-  gap: 15px;
 }
 
 .content-area {
@@ -582,6 +549,11 @@ export default {
   background: rgba(255, 255, 255, 0.8);
 }
 
+.quick-join h3 {
+  margin: 0 0 15px 0;
+  color: #333;
+}
+
 .quick-join-list {
   display: grid;
   grid-template-columns: 1fr;
@@ -619,6 +591,11 @@ export default {
   transition: all 0.2s;
 }
 
+.quick-join-item:hover {
+  border-color: #eeaa67; /* 橘黄色边框 */
+  background: #fffaf5; /* 浅橘黄色背景 */
+}
+
 .room-avatar {
   font-size: 1.5em;
 }
@@ -635,6 +612,21 @@ export default {
 .room-stats {
   font-size: 0.8em;
   color: #666;
+}
+
+.join-btn {
+  padding: 6px 12px;
+  background: #eeaa67; /* 橘黄色按钮 */
+  color: white;
+  border: none;
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 0.9em;
+  transition: background-color 0.2s;
+}
+
+.join-btn:hover {
+  background: #e69c55; /* 深橘黄色 */
 }
 
 .right-sidebar {
@@ -666,14 +658,11 @@ export default {
   gap: 8px;
 }
 
-.btn-icon {
-  font-size: 1.2em;
-}
-
-/* 响应式设计 */
+/* 响应式设计 (更新 grid-template-columns) */
 @media (max-width: 1024px) {
+  /* 调整为左侧 250px，中央 1fr */
   .main-grid {
-    grid-template-columns: 200px 1fr;
+    grid-template-columns: 250px 1fr;
   }
   .right-sidebar {
     display: none;
@@ -685,7 +674,8 @@ export default {
     grid-template-columns: 1fr;
     gap: 15px;
   }
-  .widgets-area {
+  .friends-list-area {
+    /* 在小屏上隐藏左侧好友列表 */
     display: none;
   }
 }
