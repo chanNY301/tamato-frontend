@@ -1,10 +1,4 @@
 // 使用 fetch 替代 axios
-<<<<<<< HEAD
-const request = {
-  async post(url, data) {
-    try {
-      console.log('🚀 发送请求到:', url)
-=======
 import { getToken } from './config'
 
 // 构建请求头
@@ -27,25 +21,10 @@ const request = {
   async post(url, data, options = {}) {
     try {
       console.log('🚀 发送POST请求到:', url)
->>>>>>> zhangxy
       console.log('📦 请求数据:', data)
       
       const response = await fetch(url, {
         method: 'POST',
-<<<<<<< HEAD
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(data)
-      })
-      
-      const result = await response.json()
-      console.log('✅ 请求成功:', result)
-      return result
-      
-    } catch (error) {
-      console.error('❌ 请求失败:', error)
-=======
         headers: buildHeaders(options.includeAuth !== false),
         body: JSON.stringify(data),
         ...options
@@ -96,17 +75,10 @@ const request = {
         networkError.isNetworkError = true
         throw networkError
       }
->>>>>>> zhangxy
       throw error
     }
   },
   
-<<<<<<< HEAD
-  async get(url) {
-    try {
-      console.log('🚀 发送GET请求到:', url)
-      const response = await fetch(url)
-=======
   async get(url, options = {}) {
     try {
       console.log('🚀 发送GET请求到:', url)
@@ -130,14 +102,11 @@ const request = {
         throw error
       }
       
->>>>>>> zhangxy
       const result = await response.json()
       console.log('✅ GET请求成功:', result)
       return result
     } catch (error) {
       console.error('❌ GET请求失败:', error)
-<<<<<<< HEAD
-=======
       // 如果是网络错误（无法连接到服务器）
       if (error.name === 'TypeError' && error.message.includes('fetch')) {
         const networkError = new Error('无法连接到服务器，请确保后端服务正在运行 (http://localhost:8090)')
@@ -211,7 +180,6 @@ const request = {
       }
     } catch (error) {
       console.error('❌ DELETE请求失败:', error)
->>>>>>> zhangxy
       throw error
     }
   }

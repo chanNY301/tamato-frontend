@@ -109,6 +109,12 @@ export default {
       // 使用导入的图片
       avatarImage: avatarImage,
       
+      // 用户信息
+      userInfo: {
+        avatar: null,
+        username: '用户'
+      },
+      
       // 下拉菜单显示状态
       showDropdown: false,
       dropdownTimer: null,
@@ -136,6 +142,22 @@ export default {
     // 当前显示的海报
     currentPoster() {
       return this.posters.length > 0 ? this.posters[this.currentPosterIndex] : ''
+    },
+    // 显示头像（优先使用用户头像，否则使用默认头像）
+    displayAvatar() {
+      if (this.userInfo && this.userInfo.avatar && this.userInfo.avatar !== this.avatarImage) {
+        // 如果是相对路径，添加完整URL
+        if (this.userInfo.avatar.startsWith('/')) {
+          return `http://localhost:8090${this.userInfo.avatar}`
+        }
+        // 如果已经是完整URL，直接返回
+        if (this.userInfo.avatar.startsWith('http')) {
+          return this.userInfo.avatar
+        }
+        return this.userInfo.avatar
+      }
+      // 默认头像
+      return this.avatarImage
     }
   },
   created() {
@@ -161,15 +183,19 @@ export default {
         const result = await getCurrentUser()
         
         if (result.success && result.data) {
-          this.userInfo = {
-            avatar: result.data.avatar || null
-          }
+          this.userInfo.avatar = result.data.avatar || null
+          this.userInfo.username = result.data.username || '用户'
           console.log('主页获取用户头像:', this.userInfo.avatar)
+        } else {
+          // 如果获取失败，使用默认值
+          this.userInfo.avatar = null
+          this.userInfo.username = '用户'
         }
       } catch (error) {
         console.error('获取用户信息失败:', error)
         // 失败时使用默认头像
         this.userInfo.avatar = null
+        this.userInfo.username = '用户'
       }
     },
     
@@ -766,7 +792,8 @@ export default {
     gap: 15px;
   }
   .friends-list-area {
-    /* 在小屏上隐藏左侧好友列表 */
+    display: none; /* 在小屏上隐藏左侧好友列表 */
+  }
   .widgets-area {
     display: none;
   }

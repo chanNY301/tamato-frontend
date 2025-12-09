@@ -7,10 +7,7 @@ import TaskManagementView from '../views/TaskManagementView.vue'
 import Login from '@/views/Login.vue'
 import Register from '@/views/Register.vue'
 import PersonalCenter from '@/views/PersonalCenter.vue'
-<<<<<<< HEAD
-=======
 import FriendsView from '@/views/FriendsView.vue'
->>>>>>> zhangxy
 
 
 const routes = [
@@ -54,14 +51,11 @@ const routes = [
     path: '/personal-center',
     name: 'PersonalCenter',
     component: PersonalCenter
-<<<<<<< HEAD
-=======
   },
   {
     path: '/friends',
     name: 'friends',
     component: FriendsView
->>>>>>> zhangxy
   }
 ]
 
