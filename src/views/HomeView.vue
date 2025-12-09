@@ -1,5 +1,6 @@
 <template>
   <div class="home-container">
+    <!-- 顶部导航栏 -->
     <nav class="navbar">
       <div class="nav-brand">Tomato</div>
       <div class="nav-links">
@@ -13,8 +14,9 @@
           @mouseenter="showDropdown = true"
           @mouseleave="handleAvatarLeave"
         >
-          <img :src="avatarImage" alt="用户头像" />
+          <img :src="displayAvatar" alt="用户头像" @error="handleAvatarError" />
         </div>
+        <!-- 下拉菜单 - 独立元素 -->
         <div 
           v-show="showDropdown" 
           class="dropdown-menu"
@@ -139,8 +141,44 @@ export default {
   created() {
     // 组件创建时动态加载海报
     this.loadPosters()
+    // 获取用户信息（包括头像）
+    this.fetchUserInfo()
+  },
+  
+  // 当路由激活时，重新获取用户信息（从个人中心返回时刷新头像）
+  activated() {
+    this.fetchUserInfo()
+    // 刷新任务列表（如果TaskSidebar已加载）
+    if (this.$refs.taskSidebar) {
+      this.$refs.taskSidebar.refreshTasks()
+    }
   },
   methods: {
+    // 获取用户信息
+    async fetchUserInfo() {
+      try {
+        const { getCurrentUser } = await import('@/api/user')
+        const result = await getCurrentUser()
+        
+        if (result.success && result.data) {
+          this.userInfo = {
+            avatar: result.data.avatar || null
+          }
+          console.log('主页获取用户头像:', this.userInfo.avatar)
+        }
+      } catch (error) {
+        console.error('获取用户信息失败:', error)
+        // 失败时使用默认头像
+        this.userInfo.avatar = null
+      }
+    },
+    
+    // 处理头像加载错误
+    handleAvatarError(event) {
+      console.error('头像加载失败，使用默认头像')
+      event.target.src = this.defaultAvatar
+    },
+    
     // 动态加载海报图片
     async loadPosters() {
       try {
@@ -203,17 +241,30 @@ export default {
       this.showDropdown = false
     },
     
-    // 退出登录 - 跳转到登录页面
-    logout() {
-      if (confirm('确定要退出登录吗？')) {
+    // 退出登录 - 调用后端API并跳转到登录页面
+    async logout() {
+      if (!confirm('确定要退出登录吗？')) {
+        return
+      }
+      
+      try {
+        // 调用退出登录API（logout函数内部会清除token）
+        const { logout } = await import('@/api/auth')
+        await logout()
+      } catch (error) {
+        console.error('退出登录失败:', error)
+        // 即使API调用失败，也清除本地token
+        const { removeToken } = await import('@/api/config')
+        removeToken()
+      } finally {
+        // 跳转到登录页面
         this.$router.push('/login')
       }
     },
     
     // 跳转到好友界面（预留）
     goToFriends() {
-      alert('好友功能正在开发中...')
-      // this.$router.push('/friends') // 预留跳转逻辑
+      this.$router.push('/friends')
     },
     
     // 跳转到任务管理界面
@@ -280,7 +331,7 @@ export default {
   background-color: #fefaf5; /* 浅橘黄色背景 */
 }
 
-/* 顶部导航栏 (保持不变) */
+/* 顶部导航栏 */
 .navbar {
   display: flex;
   justify-content: space-between;
@@ -375,7 +426,7 @@ export default {
   background: linear-gradient(135deg, #fef6f0 0%, #ffe4cc 100%); /* 橘黄色渐变背景 */
 }
 
-/* 快速加入区域 (保持不变) */
+/* 快速加入区域 */
 .quick-join {
   background: white;
   padding: 20px;
@@ -384,7 +435,32 @@ export default {
   border: 1px solid #ffe4cc; /* 橘黄色边框 */
 }
 
-/* 右侧边栏按钮 (保持不变) */
+.quick-join h3 {
+  margin: 0 0 15px 0;
+  color: #333;
+}
+
+.quick-join-item:hover {
+  border-color: #eeaa67; /* 橘黄色边框 */
+  background: #fffaf5; /* 浅橘黄色背景 */
+}
+
+.join-btn {
+  padding: 6px 12px;
+  background: #eeaa67; /* 橘黄色按钮 */
+  color: white;
+  border: none;
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 0.9em;
+  transition: background-color 0.2s;
+}
+
+.join-btn:hover {
+  background: #e69c55; /* 深橘黄色 */
+}
+
+/* 右侧边栏按钮 */
 .btn-primary {
   background: linear-gradient(135deg, #eeaa67, #f5b877); /* 橘黄色渐变 */
   color: white;
@@ -477,6 +553,21 @@ export default {
 .dropdown-icon {
   margin-right: 10px;
   font-size: 1.1em;
+}
+
+.main-grid {
+  display: grid;
+  grid-template-columns: 250px 1fr 300px;
+  gap: 20px;
+  padding: 20px;
+  max-width: 1400px;
+  margin: 0 auto;
+}
+
+.widgets-area {
+  display: flex;
+  flex-direction: column;
+  gap: 15px;
 }
 
 .content-area {
@@ -676,6 +767,7 @@ export default {
   }
   .friends-list-area {
     /* 在小屏上隐藏左侧好友列表 */
+  .widgets-area {
     display: none;
   }
 }

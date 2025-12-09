@@ -40,6 +40,9 @@
     <div v-if="error" class="error-message">
       {{ error }}
     </div>
+    <div v-if="successMessage" class="success-message">
+      {{ successMessage }}
+    </div>
   </div>
 </template>
 
@@ -56,6 +59,10 @@ export default {
       default: false
     },
     error: {
+      type: String,
+      default: ''
+    },
+    successMessage: {
       type: String,
       default: ''
     },
@@ -190,12 +197,60 @@ export default {
 
 .error-message {
   margin-top: 1rem;
-  padding: 12px;
-  background: #f8d7da;
-  color: #721c24;
-  border: 1px solid #f5c6cb;
-  border-radius: 6px;
+  padding: 14px 16px;
+  background: linear-gradient(135deg, #fff5f5 0%, #ffe0e0 100%);
+  color: #c53030;
+  border: 1.5px solid #fc8181;
+  border-radius: 8px;
   text-align: center;
   font-size: 0.9rem;
+  font-weight: 500;
+  box-shadow: 0 2px 8px rgba(197, 48, 48, 0.1);
+  animation: slideDown 0.3s ease-out;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+}
+
+.error-message::before {
+  content: '⚠️';
+  font-size: 1.1rem;
+}
+
+@keyframes slideDown {
+  from {
+    opacity: 0;
+    transform: translateY(-10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.success-message {
+  margin-top: 1rem;
+  padding: 14px 16px;
+  background: linear-gradient(135deg, #f0fff4 0%, #c6f6d5 100%);
+  color: #22543d;
+  border: 1.5px solid #68d391;
+  border-radius: 8px;
+  text-align: center;
+  font-size: 0.9rem;
+  font-weight: 500;
+  box-shadow: 0 2px 8px rgba(34, 84, 61, 0.1);
+  animation: slideDown 0.3s ease-out;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+}
+
+.success-message::before {
+  content: '✓';
+  font-size: 1.1rem;
+  color: #22543d;
+  font-weight: bold;
 }
 </style>

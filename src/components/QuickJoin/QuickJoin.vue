@@ -260,8 +260,14 @@ export default {
 
     getAvatarColor(name) {
       const colors = [
-        '#eeaa67', '#4dabf7', '#69db7c', '#ff922b',
-        '#748ffc', '#20c997', '#fa5252', '#7950f2'
+        '#eeaa67', // 橘黄色
+        '#4dabf7', // 蓝色
+        '#69db7c', // 绿色
+        '#ff922b', // 橙色
+        '#748ffc', // 紫色
+        '#20c997', // 青色
+        '#fa5252', // 红色
+        '#7950f2'  // 深紫色
       ]
       if (!name) return colors[0]
       const index = name.split('').reduce((acc, char) => acc + char.charCodeAt(0), 0) % colors.length

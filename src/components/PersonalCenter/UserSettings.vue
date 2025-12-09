@@ -1,328 +1,307 @@
 <template>
-  <div class="user-settings-component">
-    
-    <div v-if="loading" class="status-indicator loading">
-      <div class="spinner"></div>
-      正在加载隐私设置...
-    </div>
-    <div v-else-if="error" class="status-indicator error">
-      {{ error }}
-      <button @click="fetchPrivacySettings" class="btn-retry">重试</button>
+  <div class="privacy-settings">
+    <div v-if="loading" class="loading-container">
+      <div class="loading-spinner"></div>
+      <p>加载中...</p>
     </div>
 
-    <div v-else class="settings-container">
-      <div v-if="isSaving" class="status-indicator saving">
-        <div class="spinner"></div>
-        正在保存设置，请勿频繁操作...
-      </div>
-      
-      <section class="privacy-settings-card">
-        <h3>隐私设置</h3>
-        <p class="description">管理谁可以查看您的个人信息以及您是否可被搜索。</p>
-        
-        <div class="settings-list">
-          
-          <div class="setting-item">
-            <div class="setting-label">
-              <span class="title">允许他人查看我的生日</span>
-              <span class="subtitle">如果关闭，您的生日将只对您自己可见。</span>
-            </div>
-            <label class="toggle-switch">
-              <input 
-                type="checkbox" 
-                v-model="settings.show_birthday" 
-                @change="updateSetting('show_birthday')" 
-                :disabled="isSaving" 
-              />
-              <span class="slider round"></span>
-            </label>
-          </div>
+    <div v-else class="settings-content">
+      <div v-if="successMessage" class="success-message">{{ successMessage }}</div>
+      <div v-if="errorMessage" class="error-message">{{ errorMessage }}</div>
 
-          <div class="setting-item">
-            <div class="setting-label">
-              <span class="title">允许他人查看我的邮箱</span>
-              <span class="subtitle">您的邮箱是敏感信息，建议谨慎开启。</span>
-            </div>
-            <label class="toggle-switch">
-              <input 
-                type="checkbox" 
-                v-model="settings.show_email" 
-                @change="updateSetting('show_email')" 
-                :disabled="isSaving" 
-              />
-              <span class="slider round"></span>
-            </label>
-          </div>
+      <!-- 信息可见性设置 -->
+      <div class="settings-section">
+        <h3 class="section-title">信息可见性</h3>
+        <p class="section-description">控制哪些信息对他人可见</p>
 
-          <div class="setting-item">
-            <div class="setting-label">
-              <span class="title">允许他人查看我的手机号</span>
-              <span class="subtitle">手机号仅用于紧急联系和验证。</span>
-            </div>
-            <label class="toggle-switch">
-              <input 
-                type="checkbox" 
-                v-model="settings.show_phone" 
-                @change="updateSetting('show_phone')" 
-                :disabled="isSaving" 
-              />
-              <span class="slider round"></span>
-            </label>
+        <div class="setting-item">
+          <div class="setting-label">
+            <label>生日可见性</label>
+            <span class="setting-desc">控制谁可以看到您的生日</span>
           </div>
-
-          <div class="setting-item">
-            <div class="setting-label">
-              <span class="title">允许他人查看我的地区</span>
-              <span class="subtitle">这有助于您的朋友找到您。</span>
-            </div>
-            <label class="toggle-switch">
-              <input 
-                type="checkbox" 
-                v-model="settings.show_location" 
-                @change="updateSetting('show_location')" 
-                :disabled="isSaving" 
-              />
-              <span class="slider round"></span>
-            </label>
-          </div>
-
-          <div class="setting-item">
-            <div class="setting-label">
-              <span class="title">允许被搜索</span>
-              <span class="subtitle">允许其他用户通过您的用户名、邮箱或手机号搜索到您。</span>
-            </div>
-            <label class="toggle-switch">
-              <input 
-                type="checkbox" 
-                v-model="settings.searchable" 
-                @change="updateSetting('searchable')" 
-                :disabled="isSaving" 
-              />
-              <span class="slider round"></span>
-            </label>
-          </div>
-
+          <select v-model="privacyForm.show_birthday" class="form-select">
+            <option value="public">所有人可见</option>
+            <option value="friends">仅好友可见</option>
+            <option value="private">仅自己可见</option>
+          </select>
         </div>
-      </section>
-      
+
+        <div class="setting-item">
+          <div class="setting-label">
+            <label>学习时长可见性</label>
+            <span class="setting-desc">控制谁可以看到您的学习时长</span>
+          </div>
+          <select v-model="privacyForm.show_study_time" class="form-select">
+            <option value="public">所有人可见</option>
+            <option value="friends">仅好友可见</option>
+            <option value="private">仅自己可见</option>
+          </select>
+        </div>
+
+        <div class="setting-item">
+          <div class="setting-label">
+            <label>地区可见性</label>
+            <span class="setting-desc">控制谁可以看到您的地区信息</span>
+          </div>
+          <select v-model="privacyForm.show_location" class="form-select">
+            <option value="public">所有人可见</option>
+            <option value="friends">仅好友可见</option>
+            <option value="private">仅自己可见</option>
+          </select>
+        </div>
+      </div>
+
+      <!-- 社交设置 -->
+      <div class="settings-section">
+        <h3 class="section-title">社交设置</h3>
+        <p class="section-description">控制您的社交功能</p>
+
+        <div class="setting-item toggle-item">
+          <div class="setting-label">
+            <label>允许好友申请</label>
+            <span class="setting-desc">允许其他用户向您发送好友申请</span>
+          </div>
+          <label class="toggle-switch">
+            <input 
+              type="checkbox" 
+              v-model="privacyForm.allow_friend_request"
+            />
+            <span class="toggle-slider"></span>
+          </label>
+        </div>
+
+        <div class="setting-item toggle-item">
+          <div class="setting-label">
+            <label>允许被搜索</label>
+            <span class="setting-desc">允许其他用户通过搜索找到您</span>
+          </div>
+          <label class="toggle-switch">
+            <input 
+              type="checkbox" 
+              v-model="privacyForm.searchable"
+            />
+            <span class="toggle-slider"></span>
+          </label>
+        </div>
+      </div>
+
+      <!-- 操作按钮 -->
+      <div class="settings-actions">
+        <button 
+          class="btn-save" 
+          @click="saveSettings" 
+          :disabled="isSaving"
+        >
+          {{ isSaving ? '保存中...' : '保存设置' }}
+        </button>
+        <button 
+          class="btn-reset" 
+          @click="resetSettings" 
+          :disabled="isSaving"
+        >
+          重置
+        </button>
+      </div>
     </div>
   </div>
 </template>
 
 <script>
-const BASE_URL = 'http://127.0.0.1:4523/m1/7239915-6966518-default';
+import { getCurrentUserPrivacy, updateCurrentUserPrivacy } from '@/api/user'
 
 export default {
   name: 'UserSettings',
-  props: {
-    userInfo: Object,
-  },
   data() {
     return {
-      loading: false,
-      error: '',
-      isSaving: false, 
-      settings: {
-        show_birthday: false,
-        show_email: false,
-        show_phone: false,
-        show_location: false,
-        searchable: false,
+      loading: true,
+      isSaving: false,
+      successMessage: '',
+      errorMessage: '',
+      privacyForm: {
+        show_birthday: 'public',
+        show_study_time: 'public',
+        show_location: 'public',
+        allow_friend_request: true,
+        searchable: true
       },
-    };
+      originalForm: null // 保存原始数据用于重置
+    }
   },
   created() {
-    this.fetchPrivacySettings();
+    this.fetchPrivacySettings()
   },
   methods: {
-    // 获取隐私设置
     async fetchPrivacySettings() {
-      if (this.isSaving) return;
-
-      this.loading = true;
-      this.error = '';
-
+      this.loading = true
+      this.errorMessage = ''
+      
       try {
-        const response = await fetch(`${BASE_URL}/me/privacy`);
-        const result = await response.json();
-
-        if (response.ok && result.code === 200 && result.data) {
-          Object.keys(this.settings).forEach(key => {
-            if (key in result.data) {
-              this.settings[key] = result.data[key];
-            }
-          });
-          this.error = ''; 
-        } else {
-          this.error = result.message || '获取隐私设置失败。';
-          console.error('API Error:', result);
+        const result = await getCurrentUserPrivacy()
+        
+        // 后端可能返回 {code, message, data} 或 {success, data} 格式
+        let data = null
+        if (result.code === 200 && result.data) {
+          data = result.data
+        } else if (result.success && result.data) {
+          data = result.data
+        } else if (result.data) {
+          data = result.data
         }
-      } catch (err) {
-        this.error = '网络请求失败，请检查服务连接。';
-        console.error('Fetch Error:', err);
-      } finally {
-        this.loading = false;
-      }
-    },
-    
-    // 更新单个隐私设置
-    async updateSetting(key) {
-      // 在 @change 触发时，v-model 已经更新了 settings[key]
-      const oldValue = !this.settings[key]; 
-
-      if (this.isSaving) {
-        this.settings[key] = oldValue; // 回滚
-        alert('正在进行其他保存操作，请稍候！'); 
-        return;
-      }
-
-      this.isSaving = true;
-      this.error = '';
-
-      try {
-        // PUT 请求需要发送整个 settings 对象
-        const response = await fetch(`${BASE_URL}/me/privacy`, {
-          method: 'PUT',
-          headers: { 
-            'Content-Type': 'application/json' 
-          },
-          body: JSON.stringify(this.settings)
-        });
-
-        const result = await response.json();
-
-        if (response.ok && result.code === 200) {
-          // 直接使用返回的 data 更新本地状态
-          if (result.data) {
-            Object.assign(this.settings, result.data);
+        
+        if (data) {
+          this.privacyForm = {
+            show_birthday: data.show_birthday || 'public',
+            show_study_time: data.show_study_time || 'public',
+            show_location: data.show_location || 'public',
+            allow_friend_request: data.allow_friend_request !== false, // 默认为true
+            searchable: data.searchable !== false // 默认为true
           }
-          console.log('隐私设置更新成功。');
+          // 保存原始数据
+          this.originalForm = JSON.parse(JSON.stringify(this.privacyForm))
         } else {
-          // 更新失败：回滚本地更改，并显示错误
-          this.error = `更新失败: ${result.message || '服务器错误'}`;
-          this.settings[key] = oldValue; 
+          // 如果获取失败，使用默认值
+          this.originalForm = JSON.parse(JSON.stringify(this.privacyForm))
         }
-      } catch (err) {
-        this.error = '网络请求失败，请检查服务连接。'
-        this.settings[key] = oldValue; 
-        console.error('Update Error:', err);
+      } catch (error) {
+        console.error('获取隐私设置失败:', error)
+        this.errorMessage = '获取隐私设置失败，请刷新重试'
+        // 使用默认值
+        this.originalForm = JSON.parse(JSON.stringify(this.privacyForm))
       } finally {
-        this.isSaving = false;
+        this.loading = false
       }
     },
-  },
-};
+
+    async saveSettings() {
+      this.isSaving = true
+      this.successMessage = ''
+      this.errorMessage = ''
+
+      try {
+        const result = await updateCurrentUserPrivacy(this.privacyForm)
+
+        // 后端可能返回 {code, message, data} 或 {success, data} 格式
+        if ((result.code === 200) || (result.success === true)) {
+          this.successMessage = '隐私设置已保存'
+          // 更新原始数据
+          this.originalForm = JSON.parse(JSON.stringify(this.privacyForm))
+          // 3秒后清除成功消息
+          setTimeout(() => {
+            this.successMessage = ''
+          }, 3000)
+        } else {
+          this.errorMessage = result.message || '保存失败，请重试'
+        }
+      } catch (error) {
+        console.error('保存隐私设置失败:', error)
+        this.errorMessage = '保存失败，请检查网络连接后重试'
+      } finally {
+        this.isSaving = false
+      }
+    },
+
+    resetSettings() {
+      if (this.originalForm) {
+        this.privacyForm = JSON.parse(JSON.stringify(this.originalForm))
+        this.successMessage = ''
+        this.errorMessage = ''
+      }
+    }
+  }
+}
 </script>
 
 <style scoped>
-.user-settings-component {
-  padding: 10px;
+.privacy-settings {
+  padding: 20px;
 }
 
-/* 状态指示样式 */
-.status-indicator {
-  padding: 15px;
-  text-align: center;
-  border-radius: 8px;
-  font-weight: 500;
-  margin: 15px 0;
+.loading-container {
   display: flex;
+  flex-direction: column;
   align-items: center;
   justify-content: center;
+  padding: 60px 0;
+  color: #666;
 }
 
-.loading {
-  color: #007bff;
-  background-color: #e9f7ff;
-}
-
-.saving {
-  color: #ffa500;
-  background-color: #fff8e1;
-  border: 1px solid #ffd700;
-}
-
-.error {
-  color: #cc2a1f;
-  background-color: #ffe0e0;
-  border: 1px solid #cc2a1f;
-}
-
-.btn-retry {
-  background: none;
-  border: 1px solid #cc2a1f;
-  color: #cc2a1f;
-  margin-left: 10px;
-  padding: 4px 10px;
-  border-radius: 4px;
-  cursor: pointer;
-  transition: background-color 0.2s;
-}
-
-.btn-retry:hover {
-  background-color: #cc2a1f;
-  color: white;
-}
-
-/* 加载动画 */
-.spinner {
-  display: inline-block;
-  width: 12px;
-  height: 12px;
-  border: 2px solid rgba(0, 123, 255, 0.3);
+.loading-spinner {
+  width: 40px;
+  height: 40px;
+  border: 4px solid #f3f3f3;
+  border-top: 4px solid #cc2a1f;
   border-radius: 50%;
-  border-top-color: currentColor; 
   animation: spin 1s linear infinite;
-  margin-right: 8px;
-}
-
-@keyframes spin {
-  to { transform: rotate(360deg); }
-}
-
-/* 设置容器和卡片样式 */
-.settings-container {
-  max-width: 800px;
-  margin: 0 auto;
-}
-
-.privacy-settings-card {
-  background: #ffffff;
-  padding: 30px 20px;
-  border-radius: 12px;
-}
-
-.privacy-settings-card h3 {
-  margin-top: 0;
-  color: #333;
-  font-size: 1.4em;
-  border-bottom: 2px solid #f0f0f0;
-  padding-bottom: 15px;
   margin-bottom: 20px;
 }
 
-.description {
-  color: #666;
-  font-size: 0.95em;
-  margin-bottom: 30px;
+@keyframes spin {
+  0% { transform: rotate(0deg); }
+  100% { transform: rotate(360deg); }
 }
 
-/* 设置列表样式 */
-.settings-list {
-  display: flex;
-  flex-direction: column;
-  gap: 1px; 
-  border: 1px solid #e0e0e0;
+.settings-content {
+  max-width: 800px;
+}
+
+.success-message {
+  background: linear-gradient(135deg, #4caf50, #66bb6a);
+  color: white;
+  padding: 12px 20px;
   border-radius: 8px;
-  overflow: hidden;
+  margin-bottom: 20px;
+  box-shadow: 0 2px 8px rgba(76, 175, 80, 0.3);
+  animation: slideIn 0.3s ease;
+}
+
+.error-message {
+  background: linear-gradient(135deg, #f44336, #ef5350);
+  color: white;
+  padding: 12px 20px;
+  border-radius: 8px;
+  margin-bottom: 20px;
+  box-shadow: 0 2px 8px rgba(244, 67, 54, 0.3);
+  animation: slideIn 0.3s ease;
+}
+
+@keyframes slideIn {
+  from {
+    opacity: 0;
+    transform: translateY(-10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.settings-section {
+  background: white;
+  border-radius: 12px;
+  padding: 24px;
+  margin-bottom: 24px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+  border: 1px solid #f0f0f0;
+}
+
+.section-title {
+  font-size: 1.3em;
+  font-weight: bold;
+  color: #333;
+  margin: 0 0 8px 0;
+}
+
+.section-description {
+  color: #666;
+  font-size: 0.9em;
+  margin: 0 0 20px 0;
 }
 
 .setting-item {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  padding: 15px 20px;
-  background-color: #fcfcfc;
+  padding: 16px 0;
   border-bottom: 1px solid #f0f0f0;
 }
 
@@ -331,31 +310,55 @@ export default {
 }
 
 .setting-label {
+  flex: 1;
   display: flex;
   flex-direction: column;
-  flex-grow: 1;
+  gap: 4px;
 }
 
-.setting-label .title {
-  font-weight: 600;
+.setting-label label {
+  font-weight: 500;
   color: #333;
-  margin-bottom: 4px;
+  font-size: 1em;
 }
 
-.setting-label .subtitle {
-  font-size: 0.85em;
+.setting-desc {
   color: #888;
+  font-size: 0.85em;
 }
 
-/* ------------------------------------- */
-/* Toggle 开关样式 */
-/* ------------------------------------- */
+.form-select {
+  padding: 8px 12px;
+  border: 1px solid #ddd;
+  border-radius: 6px;
+  font-size: 1em;
+  min-width: 150px;
+  height: 40px;
+  outline: none;
+  transition: border-color 0.2s;
+  cursor: pointer;
+  appearance: none;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath fill='%23333' d='M6 9L1 4h10z'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 12px center;
+  padding-right: 35px;
+}
+
+.form-select:focus {
+  border-color: #cc2a1f;
+}
+
+/* 开关样式 */
+.toggle-item {
+  padding: 20px 0;
+}
+
 .toggle-switch {
   position: relative;
   display: inline-block;
   width: 50px;
-  height: 28px;
-  flex-shrink: 0;
+  height: 26px;
+  cursor: pointer;
 }
 
 .toggle-switch input {
@@ -364,49 +367,108 @@ export default {
   height: 0;
 }
 
-.slider {
+.toggle-slider {
   position: absolute;
-  cursor: pointer;
   top: 0;
   left: 0;
   right: 0;
   bottom: 0;
   background-color: #ccc;
-  transition: .4s;
+  transition: 0.3s;
+  border-radius: 26px;
 }
 
-.slider:before {
+.toggle-slider:before {
   position: absolute;
   content: "";
   height: 20px;
   width: 20px;
-  left: 4px;
-  bottom: 4px;
+  left: 3px;
+  bottom: 3px;
   background-color: white;
-  transition: .4s;
+  transition: 0.3s;
+  border-radius: 50%;
 }
 
-/* 选中状态 */
-input:checked + .slider {
-  background-color: #cc2a1f; /* 使用主题红色 */
+input:checked + .toggle-slider {
+  background-color: #cc2a1f;
 }
 
-input:checked + .slider:before {
-  transform: translateX(22px);
+input:checked + .toggle-slider:before {
+  transform: translateX(24px);
 }
 
-/* 禁用状态 */
-input:disabled + .slider {
+.toggle-switch:hover .toggle-slider {
+  box-shadow: 0 0 8px rgba(204, 42, 31, 0.3);
+}
+
+/* 操作按钮 */
+.settings-actions {
+  display: flex;
+  gap: 12px;
+  justify-content: flex-end;
+  margin-top: 30px;
+  padding-top: 20px;
+  border-top: 1px solid #f0f0f0;
+}
+
+.btn-save,
+.btn-reset {
+  padding: 10px 24px;
+  border: none;
+  border-radius: 6px;
+  font-size: 1em;
+  cursor: pointer;
+  transition: all 0.3s;
+  font-weight: 500;
+}
+
+.btn-save {
+  background: #cc2a1f;
+  color: white;
+}
+
+.btn-save:hover:not(:disabled) {
+  background: #b52217;
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(204, 42, 31, 0.3);
+}
+
+.btn-reset {
+  background: #f5f5f5;
+  color: #666;
+  border: 1px solid #ddd;
+}
+
+.btn-reset:hover:not(:disabled) {
+  background: #e0e0e0;
+}
+
+button:disabled {
   opacity: 0.6;
   cursor: not-allowed;
+  transform: none !important;
 }
 
-/* 圆角 */
-.slider.round {
-  border-radius: 28px;
-}
+/* 响应式设计 */
+@media (max-width: 768px) {
+  .setting-item {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 12px;
+  }
 
-.slider.round:before {
-  border-radius: 50%;
+  .form-select {
+    width: 100%;
+  }
+
+  .settings-actions {
+    flex-direction: column;
+  }
+
+  .btn-save,
+  .btn-reset {
+    width: 100%;
+  }
 }
 </style>

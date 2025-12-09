@@ -13,7 +13,12 @@
       <aside class="sidebar">
         <div class="user-info">
           <div class="avatar-container">
-            <img :src="userProfileData.avatar || avatarImage" alt="用户头像" class="avatar" />
+            <img 
+              :src="getAvatarUrl(userProfileData.avatar)" 
+              alt="用户头像" 
+              class="avatar" 
+              @error="handleSidebarAvatarError"
+            />
           </div>
           <div class="user-id">ID: {{ userProfileData.userId || '加载中...' }}</div>
         </div>
@@ -59,8 +64,7 @@ import avatarImage from '@/assets/images/avatar.png'
 import UserProfile from '@/components/PersonalCenter/UserProfile.vue';
 import UserSettings from '@/components/PersonalCenter/UserSettings.vue';
 import UserStatistics from '@/components/PersonalCenter/UserStatistics.vue';
-
-const BASE_URL = 'http://127.0.0.1:4523/m1/7239915-6966518-default';
+import { getCurrentUser } from '@/api/user';
 
 export default {
   name: 'PersonalCenter',
@@ -78,7 +82,7 @@ export default {
       navItems: [
         { key: 'profile', text: '个人资料' },
         { key: 'statistics', text: '专注统计' },
-        { key: 'settings', text: '设置' }
+        { key: 'settings', text: '隐私设置' }
       ],
       loading: false,
       error: '',
@@ -106,19 +110,81 @@ export default {
     this.fetchUserInfo();
   },
   methods: {
+    // 获取头像URL（处理相对路径和默认头像）
+    getAvatarUrl(avatar) {
+      if (!avatar) {
+        console.log('没有头像URL，使用默认头像')
+        return this.avatarImage
+      }
+      
+      // 如果是data URL，直接返回
+      if (avatar.startsWith('data:')) {
+        console.log('使用data URL头像')
+        return avatar
+      }
+      
+      // 如果已经是完整URL，直接返回
+      if (avatar.startsWith('http://') || avatar.startsWith('https://')) {
+        console.log('使用完整URL头像:', avatar)
+        return avatar
+      }
+      
+      // 如果是相对路径，转换为完整URL
+      if (avatar.startsWith('/')) {
+        // 无论是开发环境还是生产环境，都使用完整URL
+        // 因为图片资源需要通过完整的URL访问，代理可能无法正确处理图片请求
+        const fullUrl = `http://localhost:8090${avatar}`
+        console.log('头像URL（完整路径）:', fullUrl)
+        return fullUrl
+      }
+      
+      // 其他情况返回默认头像
+      return this.avatarImage
+    },
+    
+    // 处理左侧头像加载错误
+    handleSidebarAvatarError(event) {
+      console.error('左侧头像加载失败，URL:', event.target.src)
+      // 如果加载失败，使用默认头像
+      if (!event.target.src.includes('avatar.png')) {
+        event.target.src = this.avatarImage
+      }
+    },
+    
+    // 格式化生日：将时间戳（毫秒）转换为 YYYY-MM-DD 格式
+    formatBirthday(timestamp) {
+      if (!timestamp) {
+        return ''
+      }
+      const date = new Date(timestamp)
+      // 检查日期是否有效
+      if (isNaN(date.getTime())) {
+        return ''
+      }
+      const year = date.getFullYear()
+      const month = String(date.getMonth() + 1).padStart(2, '0')
+      const day = String(date.getDate()).padStart(2, '0')
+      return `${year}-${month}-${day}`
+    },
+    
     // 格式化用户信息数据
     formatUserData(data) {
       return {
-        userId: data.user_id ? String(data.user_id) : 'N/A',
+        userId: data.userId ? String(data.userId) : (data.user_id ? String(data.user_id) : 'N/A'),
         username: data.username || 'N/A',
         email: data.email || '',
         phone: data.phone || '',
-        gender: data.sex,
-        birthday: data.birthday ? String(data.birthday).replace(/(\d{4})(\d{2})(\d{2})/, '$1-$2-$3') : '',
+        gender: data.sex || '',
+        // 生日：后端返回的是时间戳（毫秒），需要转换为 YYYY-MM-DD 格式
+        birthday: data.birthday ? (typeof data.birthday === 'number' 
+          ? this.formatBirthday(data.birthday) 
+          : data.birthday) : '',
         region: data.province || '',
         tomatoCount: data.tomato || 0,
-        avatar: this.avatarImage, 
-        password_hash: data.password_hash || '',
+        // 优先使用服务器返回的头像URL
+        // 如果服务器返回了头像URL，使用它；否则使用默认头像
+        avatar: data.avatar || null, // 存储原始URL，让组件处理URL转换
+        password_hash: data.passwordHash || data.password_hash || '',
       }
     },
     
@@ -131,18 +197,17 @@ export default {
       this.error = ''
       
       try {
-        const response = await fetch(`${BASE_URL}/user/me`)
-        const result = await response.json()
+        const result = await getCurrentUser()
         
-        if (response.ok && result) {
+        if (result.success && result.data) {
           // 确保整个 userProfileData 被最新的服务器数据覆盖
-          this.userProfileData = this.formatUserData(result)
+          this.userProfileData = this.formatUserData(result.data)
         } else {
-          this.error = '加载用户信息失败。'
+          this.error = result.message || '加载用户信息失败。'
           console.error('API Error:', result)
         }
       } catch (err) {
-        this.error = '网络请求失败，请检查服务。'
+        this.error = err.message || '网络请求失败，请检查服务。'
         console.error('Fetch Error:', err)
       } finally {
         this.loading = false

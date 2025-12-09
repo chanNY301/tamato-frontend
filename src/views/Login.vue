@@ -5,6 +5,7 @@
         :is-login="true"
         :loading="loading"
         :error="error"
+        :success-message="successMessage"
         :logo="logoUrl"
         @submit="handleLogin"
         @toggle-mode="$router.push('/register')"
@@ -36,6 +37,8 @@
 <script>
 import AuthForm from '@/components/Login/AuthForm.vue'
 import FormInput from '@/components/Login/FormInput.vue'
+import { login } from '@/api/auth'
+import { getFriendlyErrorMessage } from '@/utils/errorMessages'
 
 export default {
   name: 'LoginView',
@@ -47,6 +50,7 @@ export default {
     return {
       loading: false,
       error: '',
+      successMessage: '',
       formData: {
         username: '',
         password: ''
@@ -56,6 +60,20 @@ export default {
         password: ''
       },
       logoUrl: require('@/assets/logo.png')
+    }
+  },
+  mounted() {
+    // 检查是否从注册页面跳转过来
+    if (this.$route.query.registered === 'true') {
+      this.successMessage = '注册成功！请使用您的账号登录'
+      // 自动填充用户名
+      if (this.$route.query.username) {
+        this.formData.username = this.$route.query.username
+      }
+      // 3秒后自动清除成功提示
+      setTimeout(() => {
+        this.successMessage = ''
+      }, 5000)
     }
   },
   methods: {
@@ -88,30 +106,26 @@ export default {
       this.error = ''
 
       try {
-        // 调用本地 mock 接口
-        const response = await fetch('http://127.0.0.1:4523/m1/7239915-6966518-default/auth/login', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({
-            username: this.formData.username,
-            password: this.formData.password
-          })
-        })
+        const result = await login(this.formData.username, this.formData.password)
 
-        const result = await response.json()
-
-        if (result.code === 200) {
+        if (result.success) {
           // 登录成功，跳转到首页
           setTimeout(() => {
             this.$router.push('/')
           }, 800)
         } else {
-          this.error = '用户名或密码错误'
+          // 使用友好的错误消息
+          this.error = getFriendlyErrorMessage(result.message, 'login')
         }
       } catch (err) {
-        this.error = '登录失败，请检查网络连接'
+        // 显示友好的错误信息
+        if (err.isNetworkError) {
+          this.error = '无法连接到服务器，请确保后端服务正在运行'
+        } else if (err.message) {
+          this.error = getFriendlyErrorMessage(err.message, 'login')
+        } else {
+          this.error = '登录失败，请检查网络连接后重试'
+        }
         console.error('登录请求失败:', err)
       } finally {
         this.loading = false

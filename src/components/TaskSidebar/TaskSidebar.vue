@@ -12,19 +12,19 @@
       <div class="task-list">
         <div 
           v-for="task in pendingTasks" 
-          :key="task.task_id"
+          :key="task.task_id || task.taskId"
           class="task-item"
-          :class="{ 'active': task.status === '进行中' }"
+          :class="{ 'active': (task.status || task.taskStatus) === '进行中' }"
           @click="toggleTaskStatus(task)"
         >
           <div class="task-item-main">
             <div class="task-item-header">
-              <span class="task-name">{{ task.task_name }}</span>
-              <span class="task-duration">{{ task.duration }}分钟</span>
+              <span class="task-name">{{ task.task_name || task.taskName }}</span>
+              <span class="task-duration">{{ task.duration || 25 }}分钟</span>
             </div>
             <div class="task-item-footer">
-              <span class="task-status">{{ getStatusText(task.status) }}</span>
-              <span class="task-time">{{ formatTime(task.created_at) }}</span>
+              <span class="task-status">{{ getStatusText(task.status || task.taskStatus) }}</span>
+              <span class="task-time">{{ formatTime(task.created_at || task.createdAt) }}</span>
             </div>
           </div>
         </div>
@@ -54,6 +54,7 @@
 
 <script>
 import { getTasks, updateTask } from '@/api/tasks'
+import { getCurrentUser } from '@/api/user'
 
 export default {
   name: 'TaskSidebar',
@@ -67,6 +68,7 @@ export default {
   data() {
     return {
       tasks: [],
+      userId: null, // 当前用户ID
       loading: false,
       isCollapsed: this.initiallyCollapsed
     }
@@ -74,19 +76,24 @@ export default {
   computed: {
     // 未完成的任务（包括进行中和未完成）
     pendingTasks() {
-      return this.tasks.filter(task => 
-        task.status === '未完成' || task.status === '进行中'
-      )
+      return this.tasks.filter(task => {
+        const status = task.status || task.taskStatus
+        return status === '未完成' || status === '进行中' || status === '未开始'
+      })
     },
     totalTasks() {
       return this.tasks.length
     },
     completedTasks() {
-      return this.tasks.filter(task => task.status === '已完成').length
+      return this.tasks.filter(task => {
+        const status = task.status || task.taskStatus
+        return status === '已完成'
+      }).length
     }
   },
-  mounted() {
-    this.loadTasks()
+  async mounted() {
+    await this.initUser()
+    await this.loadTasks()
     // 可选：定时刷新任务列表
     // this.refreshInterval = setInterval(this.loadTasks, 60000) // 每分钟刷新一次
   },
@@ -96,15 +103,44 @@ export default {
     // }
   },
   methods: {
+    async initUser() {
+      try {
+        const userResult = await getCurrentUser()
+        if (userResult.success && userResult.data) {
+          this.userId = userResult.data.user_id
+        } else {
+          console.error('获取用户信息失败')
+        }
+      } catch (error) {
+        console.error('初始化用户失败:', error)
+      }
+    },
+
     async loadTasks() {
+      if (!this.userId) {
+        console.error('用户ID未获取，无法加载任务')
+        return
+      }
+
       try {
         this.loading = true
-        const response = await getTasks()
-        if (response && response.data) {
-          this.tasks = response.data
+        const response = await getTasks(this.userId)
+        console.log('TaskSidebar获取任务列表响应:', response)
+        
+        // 处理后端返回的数据格式
+        if (response.success === true || response.success === "true" || response.code === 200) {
+          // 可能是 {success: true, data: []} 或 {code: 200, data: []} 格式
+          this.tasks = response.data || []
+        } else if (Array.isArray(response)) {
+          // 如果直接返回数组
+          this.tasks = response
+        } else {
+          console.error('获取任务失败:', response.message || '未知错误')
+          this.tasks = []
         }
       } catch (error) {
         console.error('加载任务失败:', error)
+        this.tasks = []
       } finally {
         this.loading = false
       }
@@ -112,26 +148,38 @@ export default {
 
     async toggleTaskStatus(task) {
       try {
+        const currentStatus = task.status || task.taskStatus
         let newStatus
-        if (task.status === '未完成') {
+        if (currentStatus === '未完成' || currentStatus === '未开始') {
           newStatus = '进行中'
-        } else if (task.status === '进行中') {
+        } else if (currentStatus === '进行中') {
           newStatus = '已完成'
         } else {
           newStatus = '未完成'
         }
 
-        await updateTask(task.task_id, {
-          ...task,
-          status: newStatus
-        })
+        const taskId = task.task_id || task.taskId
+        const updateData = {
+          task_name: task.task_name || task.taskName,
+          task_note: task.task_note || task.taskNote || null,
+          task_id: taskId
+        }
+        
+        const response = await updateTask(taskId, updateData)
+        console.log('TaskSidebar更新任务状态响应:', response)
+        
+        // 检查响应
+        if (response.success === false || response.success === "false") {
+          console.error('更新任务状态失败:', response.message)
+          return
+        }
         
         // 重新加载任务列表
         await this.loadTasks()
         
         // 触发事件通知父组件
         this.$emit('task-status-changed', {
-          taskId: task.task_id,
+          taskId: taskId,
           newStatus: newStatus
         })
       } catch (error) {

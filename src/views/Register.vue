@@ -5,6 +5,7 @@
         :is-login="false"
         :loading="loading"
         :error="error"
+        :success-message="successMessage"
         :logo="logoUrl"
         @submit="handleRegister"
         @toggle-mode="$router.push('/login')"
@@ -54,6 +55,8 @@
 <script>
 import AuthForm from '@/components/Login/AuthForm.vue'
 import FormInput from '@/components/Login/FormInput.vue'
+import { register } from '@/api/auth'
+import { getFriendlyErrorMessage } from '@/utils/errorMessages'
 
 export default {
   name: 'RegisterView',
@@ -65,6 +68,7 @@ export default {
     return {
       loading: false,
       error: '',
+      successMessage: '',
       formData: {
         username: '',
         email: '',
@@ -139,39 +143,67 @@ export default {
         return
       }
 
+      // 防止重复提交
+      if (this.loading) {
+        return
+      }
+
       this.loading = true
       this.error = ''
+      this.successMessage = ''
 
       try {
-        // 调用注册接口
-        const response = await fetch('http://127.0.0.1:4523/m1/7239915-6966518-default/auth/register', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({
-            username: this.formData.username,
-            email: this.formData.email,
-            password_hash: this.formData.password
-          })
-        })
+        const result = await register(
+          this.formData.username,
+          this.formData.email,
+          this.formData.password
+        )
 
-        const result = await response.json()
-        console.log('注册接口返回:', result) // 调试用，查看实际返回的code
+        // 清除之前的错误和成功消息
+        this.error = ''
+        this.successMessage = ''
 
-        if (result.code === 200) {
-          // 200注册成功
-          this.error = '注册成功！正在跳转到登录页...'
+        if (result && result.success) {
+          // 注册成功，显示提示信息并跳转到登录页面
+          this.successMessage = '注册成功！请使用您的账号登录'
           
           setTimeout(() => {
-            this.$router.push('/login')
-          }, 1000)
+            // 跳转到登录页面，并传递注册成功的提示
+            this.$router.push({
+              path: '/login',
+              query: { registered: 'true', username: this.formData.username }
+            })
+          }, 2000)
         } else {
-          // 其他code都判定为失败
-          this.error = '注册失败，请重试'
+          // 注册失败，使用友好的错误消息
+          this.error = getFriendlyErrorMessage(result?.message || '注册失败，请重试', 'register')
         }
       } catch (err) {
-        this.error = '注册失败，请检查网络连接'
+        // 清除成功消息，只显示错误
+        this.successMessage = ''
+        
+        // 检查错误响应中是否包含 result（可能是 JSON 格式的错误）
+        if (err.result && err.result.success === false) {
+          // 如果错误响应是 JSON 格式，使用其中的消息
+          this.error = getFriendlyErrorMessage(err.result.message || err.message, 'register')
+        } else if (err.isNetworkError) {
+          this.error = '无法连接到服务器，请确保后端服务正在运行'
+        } else if (err.message) {
+          // 尝试从错误消息中提取 JSON（如果是 JSON 字符串）
+          try {
+            const errorObj = JSON.parse(err.message)
+            if (errorObj.message) {
+              this.error = getFriendlyErrorMessage(errorObj.message, 'register')
+            } else {
+              this.error = getFriendlyErrorMessage(err.message, 'register')
+            }
+          } catch (e) {
+            // 不是 JSON 格式，直接使用错误消息
+            this.error = getFriendlyErrorMessage(err.message, 'register')
+          }
+        } else {
+          this.error = '注册失败，请检查网络连接后重试'
+        }
         console.error('注册请求失败:', err)
       } finally {
         this.loading = false
