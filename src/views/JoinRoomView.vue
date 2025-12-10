@@ -19,7 +19,7 @@
         <!-- 左侧：输入加入码 -->
         <div class="join-method-card code-join-section">
           <div class="method-header">
-            <div class="method-icon">🔑</div>
+            <div class="method-icon"></div>
             <h2 class="method-title">输入加入码加入</h2>
           </div>
           
@@ -29,18 +29,31 @@
               <input 
                 type="text" 
                 v-model="joinCode" 
-                placeholder="请输入6位加入码"
+                placeholder="请输入房间号"
                 class="form-input"
+                :disabled="loading"
                 maxlength="6"
-                @keyup.enter="confirmJoin"
+                @keyup.enter="validateAndJoin"
               >
+              <div v-if="errorMessage" class="error-message">
+                {{ errorMessage }}
+              </div>
             </div>
 
             <div class="button-group">
-              <button class="btn-primary" @click="confirmJoin">
-                确认加入
+              <button 
+                class="btn-primary" 
+                @click="validateAndJoin"
+                :disabled="loading || !joinCode.trim()"
+              >
+                <span v-if="loading">验证中...</span>
+                <span v-else>确认加入</span>
               </button>
-              <button class="btn-secondary" @click="goToHome">
+              <button 
+                class="btn-secondary" 
+                @click="goToHome"
+                :disabled="loading"
+              >
                 返回首页
               </button>
             </div>
@@ -55,14 +68,14 @@
         <!-- 右侧：快速加入 -->
         <div class="join-method-card quick-join-section">
           <div class="method-header">
-            <div class="method-icon">⚡</div>
+            <div class="method-icon"></div>
             <h2 class="method-title">快速加入</h2>
           </div>
           
           <div class="method-content">
             <!-- 预留动态内容区域 -->
             <div class="dynamic-content-placeholder">
-              <div class="placeholder-icon">📚</div>
+              <div class="placeholder-icon"></div>
               <p class="placeholder-text">热门自习室将在这里显示</p>
               <p class="placeholder-subtext">内容动态加载中...</p>
             </div>
@@ -72,34 +85,88 @@
           </div>
         </div>
       </div>
+
+      <!-- 房间不存在提示弹窗 -->
+      <div v-if="showRoomNotFound" class="room-not-found-modal">
+        <div class="modal-overlay" @click="closeRoomNotFound">
+          <div class="modal-content" @click.stop>
+            <div class="modal-header">
+              <h3>房间不存在</h3>
+            </div>
+            <div class="modal-body">
+              <p>房间号 <strong>{{ joinCode }}</strong> 不存在，请检查后重试。</p>
+            </div>
+            <div class="modal-footer">
+              <button class="modal-btn" @click="closeRoomNotFound">确定</button>
+            </div>
+          </div>
+        </div>
+      </div>
     </main>
   </div>
 </template>
 
 <script>
+import { getRoomDetail } from '@/api/studyRooms'
+
 export default {
   name: 'JoinRoomView',
   data() {
     return {
-      joinCode: ''
+      joinCode: '',
+      loading: false,
+      errorMessage: '',
+      showRoomNotFound: false
     }
   },
   methods: {
-    // 确认加入自习室
-    confirmJoin() {
+    // 验证房间并加入
+    async validateAndJoin() {
       if (!this.joinCode.trim()) {
-        alert('请输入自习室加入码')
+        this.errorMessage = '请输入房间号'
         return
       }
       
-      if (this.joinCode.length !== 6) {
-        alert('加入码应为6位字符')
-        return
-      }
+      this.loading = true
+      this.errorMessage = ''
       
-      // 这里调用加入自习室的API
-      console.log('加入自习室:', this.joinCode)
-      this.$router.push(`/study-room/${this.joinCode}`)
+      try {
+        // 1. 验证房间是否存在
+        console.log('验证房间是否存在:', this.joinCode)
+        const response = await getRoomDetail(this.joinCode)
+        
+        console.log('房间验证响应:', response)
+        
+        // 2. 根据响应判断房间是否存在
+        if (response && response.code === 200 && response.data) {
+          // 房间存在，可以进入
+          console.log('房间存在，跳转到房间页面')
+          this.$router.push(`/study-room/${this.joinCode}`)
+        } else {
+          // 房间不存在，显示错误弹窗
+          console.log('房间不存在，显示错误提示')
+          this.showRoomNotFound = true
+        }
+      } catch (error) {
+        console.error('验证房间时出错:', error)
+        
+        // 根据错误类型显示不同的提示
+        if (error.response && error.response.status === 404) {
+          this.showRoomNotFound = true
+        } else if (error.response && error.response.status === 403) {
+          this.errorMessage = '该自习室已满员'
+        } else {
+          this.errorMessage = '验证失败，请检查网络连接'
+        }
+      } finally {
+        this.loading = false
+      }
+    },
+    
+    // 关闭房间不存在弹窗
+    closeRoomNotFound() {
+      this.showRoomNotFound = false
+      this.joinCode = '' // 清空输入框，方便重新输入
     },
     
     // 跳转到创建自习室页面
@@ -115,7 +182,106 @@ export default {
 }
 </script>
 
+
 <style scoped>
+
+/* 错误提示 */
+.error-message {
+  color: #ff6b6b;
+  font-size: 0.9em;
+  margin-top: 8px;
+  padding: 8px 12px;
+  background: #fff5f5;
+  border-radius: 6px;
+  border-left: 3px solid #ff6b6b;
+}
+
+/* 房间不存在弹窗 */
+.room-not-found-modal .modal-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.5);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+}
+
+.room-not-found-modal .modal-content {
+  background: white;
+  border-radius: 16px;
+  padding: 30px;
+  max-width: 400px;
+  width: 90%;
+  text-align: center;
+  box-shadow: 0 10px 40px rgba(0, 0, 0, 0.2);
+  border: 1px solid #ffe4cc;
+}
+
+.room-not-found-modal .modal-header h3 {
+  margin: 0 0 16px 0;
+  color: #333;
+  font-size: 1.5em;
+  font-weight: 600;
+}
+
+.room-not-found-modal .modal-body p {
+  margin: 0 0 20px 0;
+  color: #666;
+  line-height: 1.6;
+}
+
+.room-not-found-modal .modal-body strong {
+  color: #eeaa67;
+  font-weight: 600;
+}
+
+.room-not-found-modal .modal-footer {
+  margin-top: 20px;
+}
+
+.room-not-found-modal .modal-btn {
+  padding: 12px 24px;
+  background: #eeaa67;
+  color: white;
+  border: none;
+  border-radius: 8px;
+  font-size: 1em;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.3s ease;
+}
+
+.room-not-found-modal .modal-btn:hover {
+  background: #e69c55;
+  transform: translateY(-1px);
+}
+
+/* 按钮禁用状态 */
+.btn-primary:disabled,
+.btn-secondary:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+  transform: none !important;
+}
+
+/* 输入框禁用状态 */
+.form-input:disabled {
+  background: #f8f9fa;
+  cursor: not-allowed;
+  opacity: 0.7;
+}
+
+/* 输入框焦点状态 */
+.form-input:focus {
+  outline: none;
+  border-color: #eeaa67;
+  box-shadow: 0 0 0 3px rgba(238, 170, 103, 0.1);
+}
+
 .join-room-container {
   min-height: 100vh;
   background: linear-gradient(135deg, #fefaf5 0%, #fff5eb 100%);

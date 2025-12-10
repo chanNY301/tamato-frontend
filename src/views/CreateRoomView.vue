@@ -98,12 +98,14 @@
 
 <script>
 import { createRoom } from '@/api/studyRooms'
+import { getCurrentUser } from '@/api/user'  // 导入获取用户信息的API
 
 export default {
   name: 'CreateRoomView',
   data() {
     return {
       loading: false,
+      currentUser: null,  // 添加当前用户信息
       roomForm: {
         room_name: '',
         description: '',
@@ -112,44 +114,114 @@ export default {
       }
     }
   },
+  async mounted() {
+    // 页面加载时获取当前用户信息
+    await this.loadCurrentUser()
+  },
   methods: {
+    // 加载当前用户信息
+    async loadCurrentUser() {
+      try {
+        const response = await getCurrentUser()
+        
+        if (response.success && response.data) {
+          this.currentUser = response.data
+          console.log('获取到当前用户:', this.currentUser)
+        } else {
+          console.warn('获取用户信息失败:', response)
+          // 如果获取失败，使用默认值
+          this.setDefaultUser()
+        }
+      } catch (error) {
+        console.error('获取用户信息时出错:', error)
+        this.setDefaultUser()
+      }
+    },
+    
+    // 设置默认用户信息（备用）
+    setDefaultUser() {
+      this.currentUser = {
+        id: 'user_unknown',
+        username: '未知用户',
+        email: 'unknown@example.com'
+      }
+    },
+    
     async createRoom() {
       if (!this.roomForm.room_name.trim()) {
         alert('请输入自习室名称')
+        return
+      }
+      
+      // 检查是否有用户信息
+      if (!this.currentUser) {
+        alert('无法获取用户信息，请重新登录')
+        this.$router.push('/login')
         return
       }
 
       this.loading = true
 
       try {
-        // 使用前端表单数据，但保持成功的字段结构
+        // 使用真实用户信息
         const requestData = {
-          room_id: 'R' + Date.now().toString().slice(-6), // 基于时间生成唯一ID
+          room_id: Date.now().toString().slice(-6), // 基于时间生成唯一ID
           room_name: this.roomForm.room_name.trim(),
-          create_person: 'user_123', // 保持成功的值
+          description: this.roomForm.description.trim() || '一起来学习吧！',
+          create_person: this.currentUser.username,  // 使用真实用户名
+          user_id: this.currentUser.id || this.currentUser.user_id,  // 使用真实用户ID
           max_members: parseInt(this.roomForm.max_members),
-          current_time: Math.floor(Date.now() / 1000),
-          end_time: Math.floor(Date.now() / 1000) + 7200,
-          music_name: this.roomForm.music_name
+          music_name: this.roomForm.music_name,
+          // 可以根据需要添加其他字段
+          created_at: new Date().toISOString(),
+          status: 'active'
         }
 
-        console.log('发送请求:', requestData)
+        console.log('发送创建请求:', requestData)
         
         const response = await createRoom(requestData)
-        console.log('响应结果:', response)
+        console.log('创建响应结果:', response)
         
-        // 使用请求中的room_id跳转
-        const roomId = requestData.room_id
-        alert(`自习室创建成功！房间ID: ${roomId}`)
-        
-        this.$router.push({
-          name: 'study-room', 
-          params: { roomId: roomId }
-        })
+        // 处理响应
+        if (response.success || response.code === 200) {
+          // 使用响应中的room_id或请求中的room_id
+          const roomId = response.data?.room_id || requestData.room_id
+          
+          alert(`自习室创建成功！\n房间名称: ${requestData.room_name}\n房间ID: ${roomId}`)
+          
+          // 跳转到新创建的自习室
+          this.$router.push({
+            name: 'study-room', 
+            params: { roomId: roomId }
+          })
+        } else {
+          // 处理创建失败
+          const errorMessage = response.message || '创建失败，请稍后重试'
+          alert(`创建失败: ${errorMessage}`)
+        }
         
       } catch (error) {
         console.error('请求异常:', error)
-        alert('创建失败，请检查网络连接')
+        
+        // 更详细的错误提示
+        if (error.response) {
+          // 服务器返回了错误状态码
+          const status = error.response.status
+          if (status === 401) {
+            alert('登录已过期，请重新登录')
+            this.$router.push('/login')
+          } else if (status === 403) {
+            alert('权限不足，无法创建自习室')
+          } else {
+            alert(`服务器错误 (${status}): ${error.response.data?.message || '创建失败'}`)
+          }
+        } else if (error.request) {
+          // 请求已发出但没有收到响应
+          alert('网络错误，请检查网络连接')
+        } else {
+          // 其他错误
+          alert(`创建失败: ${error.message || '未知错误'}`)
+        }
       } finally {
         this.loading = false
       }

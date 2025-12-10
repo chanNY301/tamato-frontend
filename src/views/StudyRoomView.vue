@@ -7,11 +7,32 @@
       </div>
     </nav>
 
+    <!-- 加载状态 -->
     <div v-if="loading" class="loading-container">
       <div class="loading-spinner"></div>
-      <p>正在加载自习室数据...</p>
+      <p>正在验证自习室...</p>
     </div>
 
+    <!-- 房间不存在提示 -->
+    <div v-else-if="roomNotFound" class="room-not-found-container">
+      <div class="not-found-content">
+        <div class="not-found-icon"></div>
+        <h1 class="not-found-title">自习室不存在</h1>
+        <p class="not-found-message">
+          房间号 <strong>{{ roomId }}</strong> 不存在或已被解散
+        </p>
+        <div class="not-found-actions">
+          <button class="action-btn primary-btn" @click="goToHome">
+            返回首页
+          </button>
+          <button class="action-btn secondary-btn" @click="goToJoinRoom">
+            重新加入
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- 正常显示自习室内容 -->
     <main v-else class="study-room-content">
       <!-- 顶部房间名称 -->
       <div class="room-title-section">
@@ -182,7 +203,7 @@
 </template>
 
 <script>
-import { getRoomDetail, leaveRoom, updateUserStatus } from '@/api/studyRooms'
+import { getRoomDetail, leaveRoom, updateUserStatus, getRoomMembers } from '@/api/studyRooms'
 import PomodoroTimer from '@/components/PomodoroTimer/PomodoroTimer.vue'
 
 export default {
@@ -210,8 +231,17 @@ export default {
       loading: true,
       showSettings: false,
       isRoomOwner: false,
+      // 新增：房间是否存在标识
+      roomNotFound: false,
+      // 新增：当前用户信息
+      currentUser: {
+        id: 'user_123', // 这里需要从登录状态获取，暂时写死
+        username: '我'
+      },
       // 添加状态变化标识
       statusChanged: false,
+      // 新增：用于存储专注时长的计时器
+      focusTimer: null,
       // 移除 updateInterval 定时器
       lastRefreshTime: null
     }
@@ -225,163 +255,268 @@ export default {
     },
     restingMembers() {
       return this.members.filter(member => member.status === 'resting')
+    },
+    // 新增：房间统计数据
+    roomStatistics() {
+      const focusingCount = this.focusingMembers.length
+      const restingCount = this.restingMembers.length
+      const totalMembers = this.members.length
+      
+      // 计算当前用户的角色
+      const currentUserMember = this.members.find(member => member.user_id === this.currentUser.id)
+      const isHost = currentUserMember?.role === 'host'
+      
+      return {
+        focusingCount,
+        restingCount,
+        totalMembers,
+        isHost
+      }
     }
   },
   async mounted() {
-    await this.loadRoomData()
-    // 移除定时刷新
+    await this.validateAndLoadRoom()
   },
-  // 添加监视器，在状态变化时刷新
+  // 路由变化时重新验证
   watch: {
+    '$route.params.roomId': {
+      handler(newRoomId) {
+        if (newRoomId) {
+          this.validateAndLoadRoom()
+        }
+      },
+      immediate: false
+    },
     'userStatus.isFocusing'(newVal, oldVal) {
       if (newVal !== oldVal) {
         this.statusChanged = true
-        this.refreshRoomData()
+        this.updateUserStatusToServer()
       }
     }
   },
   methods: {
-    async loadRoomData() {
+    // 验证并加载房间数据
+    async validateAndLoadRoom() {
       try {
         this.loading = true
+        this.roomNotFound = false
         
         const response = await getRoomDetail(this.roomId)
+        console.log('房间验证响应:', response)
         
-        if (response.code === 200 && response.data) {
+        // 验证房间是否存在
+        if (response && response.code === 200 && response.data) {
+          // 房间存在，加载数据
           this.roomInfo = { ...response.data }
-          this.isRoomOwner = this.checkIfRoomOwner()
-          this.loadMembersData()
+          
+          // 加载成员列表
+          await this.loadMembersData()
+          
+          // 检查当前用户是否为房主
+          this.checkIfRoomOwner()
+          
+          console.log('房间验证成功，加载数据:', this.roomInfo)
         } else {
-          this.setDefaultRoomInfo()
+          // 房间不存在
+          this.roomNotFound = true
+          console.log('房间不存在，响应:', response)
         }
-        
       } catch (error) {
-        console.error('加载自习室数据时出错:', error)
-        this.setDefaultRoomInfo()
+        console.error('验证房间时出错:', error)
+        
+        // 根据错误类型判断
+        if (error.response && error.response.status === 404) {
+          this.roomNotFound = true
+        } else {
+          // 其他错误，也显示房间不存在
+          this.roomNotFound = true
+        }
       } finally {
         this.loading = false
         this.lastRefreshTime = Date.now()
       }
     },
 
-    // 状态变化时刷新数据
-    async refreshRoomData() {
+    // 加载成员数据（使用真实API）
+    async loadMembersData() {
       try {
-        console.log('用户状态变化，刷新房间数据...')
+        const response = await getRoomMembers(this.roomId)
+        console.log('成员列表响应:', response)
         
-        // 更新用户状态到服务器
-        await this.updateStatusToServer()
+        if (response.code === 200 && response.data && response.data.list) {
+          // 转换API返回的数据格式为前端需要的格式
+          this.members = response.data.list.map(member => {
+            const isCurrentUser = member.user_id === this.currentUser.id
+            
+            return {
+              id: member.user_id,
+              user_id: member.user_id,
+              name: isCurrentUser ? '我' : member.username,
+              username: member.username,
+              role: member.role,
+              status: member.status || 'resting',
+              focusTime: member.status === 'focusing' ? this.calculateFocusTime(member) : '',
+              restTime: member.status === 'resting' ? '休息中' : '',
+              joined_at: member.joined_at,
+              isCurrentUser: isCurrentUser
+            }
+          })
+          
+          // 更新当前用户状态
+          const currentMember = this.members.find(m => m.isCurrentUser)
+          if (currentMember) {
+            this.userStatus.isFocusing = currentMember.status === 'focusing'
+          }
+          
+          console.log('成员数据加载成功:', this.members)
+        } else {
+          console.log('成员列表API返回异常，使用临时数据')
+          this.setTempMembersData()
+        }
+      } catch (error) {
+        console.error('加载成员数据失败:', error)
+        this.setTempMembersData()
+      }
+    },
+
+    // 临时成员数据（备用）
+    setTempMembersData() {
+      this.members = [
+        {
+          id: 'user_123',
+          user_id: 'user_123',
+          name: '我',
+          username: this.currentUser.username,
+          role: 'host',
+          status: this.userStatus.isFocusing ? 'focusing' : 'resting',
+          focusTime: this.userStatus.isFocusing ? '进行中' : '',
+          restTime: this.userStatus.isFocusing ? '' : '休息中',
+          joined_at: new Date().toISOString(),
+          isCurrentUser: true
+        },
+        {
+          id: 'user_456',
+          user_id: 'user_456',
+          name: '奋斗的小红',
+          username: '奋斗的小红',
+          role: 'member',
+          status: 'focusing',
+          focusTime: '01:23:45',
+          joined_at: '2024-06-13T10:05:00Z',
+          isCurrentUser: false
+        }
+      ]
+    },
+
+    // 计算专注时间（根据加入时间或其他逻辑）
+    calculateFocusTime(member) {
+      if (member.status !== 'focusing') return ''
+      
+      // 如果有专注开始时间，计算已专注时长
+      if (member.focus_start_time) {
+        const startTime = new Date(member.focus_start_time).getTime()
+        const now = Date.now()
+        const elapsed = now - startTime
         
-        // 重新加载房间数据
-        const response = await getRoomDetail(this.roomId)
+        return this.formatTime(elapsed)
+      }
+      
+      // 否则显示默认
+      return '进行中'
+    },
+
+    // 格式化时间（毫秒转时分秒）
+    formatTime(ms) {
+      const totalSeconds = Math.floor(ms / 1000)
+      const hours = Math.floor(totalSeconds / 3600)
+      const minutes = Math.floor((totalSeconds % 3600) / 60)
+      const seconds = totalSeconds % 60
+      
+      return `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`
+    },
+
+    // 检查当前用户是否为房主
+    checkIfRoomOwner() {
+      const currentMember = this.members.find(member => member.isCurrentUser)
+      this.isRoomOwner = currentMember?.role === 'host'
+      return this.isRoomOwner
+    },
+
+    // 更新用户状态到服务器
+    async updateUserStatusToServer() {
+      try {
+        const status = this.userStatus.isFocusing ? 'focusing' : 'resting'
         
-        if (response.code === 200 && response.data) {
-          this.roomInfo = { ...response.data }
-          this.loadMembersData()
-          console.log('房间数据刷新成功')
+        // 更新本地成员列表中的当前用户状态
+        const currentMember = this.members.find(member => member.isCurrentUser)
+        if (currentMember) {
+          currentMember.status = status
+          if (status === 'focusing') {
+            currentMember.focusTime = '进行中'
+            currentMember.restTime = ''
+            
+            // 开始专注计时
+            this.startFocusTimer()
+          } else {
+            currentMember.restTime = '休息中'
+            currentMember.focusTime = ''
+            
+            // 停止专注计时
+            this.stopFocusTimer()
+          }
         }
         
+        // 调用API更新服务器状态
+        const response = await updateUserStatus({
+          roomId: this.roomId,
+          status: status,
+          userId: this.currentUser.id
+        })
+        
+        if (response.code === 200) {
+          console.log('用户状态更新成功:', status)
+          
+          // 重新加载成员列表，确保数据同步
+          await this.loadMembersData()
+        }
       } catch (error) {
-        console.error('刷新房间数据时出错:', error)
+        console.error('更新用户状态失败:', error)
       } finally {
         this.statusChanged = false
       }
     },
 
-    // 更新用户状态到服务器
-    async updateStatusToServer() {
-      try {
-        const status = this.userStatus.isFocusing ? 'focusing' : 'resting'
-        const response = await updateUserStatus({
-          roomId: this.roomId,
-          status: status,
-          focusTime: this.userStatus.focusTime
-        })
-        
-        if (response.code === 200) {
-          console.log('用户状态更新成功:', status)
+    // 开始专注计时
+    startFocusTimer() {
+      this.userStatus.focusStartTime = Date.now()
+      
+      // 清除之前的计时器
+      if (this.focusTimer) {
+        clearInterval(this.focusTimer)
+      }
+      
+      // 每秒更新专注时间
+      this.focusTimer = setInterval(() => {
+        if (this.userStatus.isFocusing) {
+          const elapsed = Date.now() - this.userStatus.focusStartTime
+          this.userStatus.focusTime = this.formatTime(elapsed)
+          
+          // 更新成员列表中的显示
+          const currentMember = this.members.find(member => member.isCurrentUser)
+          if (currentMember) {
+            currentMember.focusTime = this.userStatus.focusTime
+          }
         }
-      } catch (error) {
-        console.error('更新用户状态失败:', error)
+      }, 1000)
+    },
+
+    // 停止专注计时
+    stopFocusTimer() {
+      if (this.focusTimer) {
+        clearInterval(this.focusTimer)
+        this.focusTimer = null
       }
-    },
-
-    checkIfRoomOwner() {
-      const currentUser = 'user_123'
-      return this.roomInfo.create_person === currentUser
-    },
-
-    setDefaultRoomInfo() {
-      this.roomInfo.room_id = this.roomId
-      this.roomInfo.room_name = '自习室 ' + this.roomId
-      this.roomInfo.create_person = '未知用户'
-      this.roomInfo.max_members = 4
-      this.roomInfo.music_name = '无背景音乐'
-      this.roomInfo.current_time = 0
-      this.roomInfo.end_time = Math.floor(Date.now() / 1000) + 7200
-    },
-
-    loadMembersData() {
-      // 如果用户状态已变化，更新当前用户状态
-      if (this.statusChanged) {
-        const currentUserStatus = this.userStatus.isFocusing ? 'focusing' : 'resting'
-        
-        this.members = [
-          { 
-            id: 0, 
-            name: '我', 
-            avatar: '',
-            status: currentUserStatus,
-            focusTime: currentUserStatus === 'focusing' ? '进行中' : '',
-            restTime: currentUserStatus === 'resting' ? '休息中' : ''
-          },
-          { 
-            id: 1, 
-            name: this.roomInfo.create_person, 
-            avatar: '',
-            status: 'focusing', 
-            focusTime: '01:23:45' 
-          },
-          { 
-            id: 2, 
-            name: '学习伙伴A', 
-            avatar: '',
-            status: 'focusing', 
-            focusTime: '00:45:30' 
-          },
-          { 
-            id: 3, 
-            name: '学习伙伴B', 
-            avatar: '',
-            status: 'resting', 
-            restTime: '休息中' 
-          }
-        ]
-      } else {
-        this.members = [
-          { 
-            id: 1, 
-            name: this.roomInfo.create_person, 
-            avatar: '',
-            status: 'focusing', 
-            focusTime: '01:23:45' 
-          },
-          { 
-            id: 2, 
-            name: '学习伙伴A', 
-            avatar: '',
-            status: 'focusing', 
-            focusTime: '00:45:30' 
-          },
-          { 
-            id: 3, 
-            name: '学习伙伴B', 
-            avatar: '',
-            status: 'resting', 
-            restTime: '休息中' 
-          }
-        ]
-      }
+      this.userStatus.focusTime = '00:00:00'
     },
 
     getInitials(name) {
@@ -393,26 +528,22 @@ export default {
     handleTimerStart() {
       console.log('番茄钟开始')
       this.userStatus.isFocusing = true
-      this.updateCurrentUserStatus('focusing')
-      // 状态变化会自动触发 watch，不需要手动调用 refreshRoomData
+      // 状态变化会自动触发 watch，调用 updateUserStatusToServer
     },
     
     handleTimerPause() {
       console.log('番茄钟暂停')
-      // 如果需要，可以在这里处理暂停状态
+      // 如果需要暂停状态，可以在这里处理
     },
     
     handleTimerResume() {
       console.log('番茄钟继续')
       this.userStatus.isFocusing = true
-      // 状态变化会自动触发 watch
     },
     
     handleTimerStop() {
       console.log('番茄钟停止')
       this.userStatus.isFocusing = false
-      this.updateCurrentUserStatus('resting')
-      // 状态变化会自动触发 watch
     },
     
     handleFocusCompleted(sessions) {
@@ -420,7 +551,6 @@ export default {
       // 完成专注后自动进入休息状态
       setTimeout(() => {
         this.userStatus.isFocusing = false
-        this.updateCurrentUserStatus('resting')
       }, 1000)
     },
     
@@ -428,30 +558,6 @@ export default {
       console.log('休息被跳过')
       // 跳过休息，直接开始下一个专注
       this.userStatus.isFocusing = true
-      this.updateCurrentUserStatus('focusing')
-    },
-
-    updateCurrentUserStatus(status) {
-      let currentUser = this.members.find(member => member.name === '我')
-      if (!currentUser) {
-        currentUser = {
-          id: Date.now(),
-          name: '我',
-          avatar: '',
-          status: status
-        }
-        this.members.unshift(currentUser)
-      } else {
-        currentUser.status = status
-      }
-      
-      if (status === 'focusing') {
-        currentUser.focusTime = '进行中'
-        currentUser.restTime = undefined
-      } else {
-        currentUser.restTime = '休息中'
-        currentUser.focusTime = undefined
-      }
     },
 
     showRoomSettings() {
@@ -494,608 +600,209 @@ export default {
     goToHome() {
       console.log('跳转到首页')
       this.$router.push('/')
+    },
+
+    goToJoinRoom() {
+      this.$router.push('/join-room')
     }
   },
   beforeUnmount() {
-    // 移除组件时不需要清理定时器，因为已经移除了
+    // 清理计时器
+    if (this.focusTimer) {
+      clearInterval(this.focusTimer)
+    }
   }
 }
 </script>
 
 <style scoped>
-.study-room-view {
-  min-height: 100vh;
+/* 样式保持不变，只修改加载提示文字 */
+.loading-container p {
+  color: #666;
+  font-size: 1.1em;
+  margin-top: 16px;
+}
+
+/* 房间不存在提示容器的样式（如果你还没有添加） */
+.room-not-found-container {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: calc(100vh - 80px);
+  padding: 40px 20px;
   background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%);
 }
 
-.navbar {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  padding: 16px 5%;
-  background: rgba(255, 255, 255, 0.95);
-  backdrop-filter: blur(10px);
-  border-bottom: 1px solid #dee2e6;
-  position: sticky;
-  top: 0;
-  z-index: 100;
-}
-
-.nav-brand {
-  font-size: 1.8em;
-  font-weight: bold;
-  color: #eeaa67;
-}
-
-.nav-links {
-  display: flex;
-  gap: 30px;
-}
-
-.nav-link {
-  cursor: pointer;
-  padding: 10px 20px;
-  border-radius: 8px;
-  transition: all 0.3s ease;
-  color: #333;
-  font-weight: 500;
-}
-
-.nav-link:hover {
-  background-color: #fff5eb;
-  color: #eeaa67;
-  transform: translateY(-1px);
-}
-
-.loading-container {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  padding: 100px 20px;
+.not-found-content {
   text-align: center;
-}
-
-.loading-spinner {
-  width: 40px;
-  height: 40px;
-  border: 4px solid #f3f3f3;
-  border-top: 4px solid #eeaa67;
-  border-radius: 50%;
-  animation: spin 1s linear infinite;
-  margin-bottom: 16px;
-}
-
-@keyframes spin {
-  0% { transform: rotate(0deg); }
-  100% { transform: rotate(360deg); }
-}
-
-.study-room-content {
-  max-width: 1400px;
-  margin: 0 auto;
-  padding: 30px 5%;
-}
-
-.room-title-section {
-  text-align: center;
-  margin-bottom: 30px;
-  padding: 20px;
+  max-width: 500px;
+  width: 100%;
+  padding: 40px;
   background: white;
-  border-radius: 16px;
-  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.08);
-}
-
-.room-title {
-  font-size: 2.5em;
-  color: #333;
-  font-weight: 700;
-  margin: 0 0 8px 0;
-  background: linear-gradient(135deg, #eeaa67, #ff8c42);
-  -webkit-background-clip: text;
-  -webkit-text-fill-color: transparent;
-}
-
-.room-subtitle {
-  color: #666;
-  font-size: 1.1em;
-}
-
-.main-layout {
-  display: grid;
-  grid-template-columns: 300px 1fr 280px;
-  gap: 20px;
-  align-items: start;
-}
-
-.room-info-section {
-  display: flex;
-  flex-direction: column;
-  gap: 20px;
-}
-
-.room-basic-info {
-  background: white;
-  border-radius: 16px;
-  padding: 24px;
-  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.08);
-  border: 1px solid #e9ecef;
-}
-
-.info-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  margin-bottom: 20px;
-}
-
-.info-title {
-  font-size: 1.4em;
-  color: #333;
-  font-weight: 600;
-  margin: 0;
-}
-
-.settings-btn {
-  padding: 6px 12px;
-  background: #6c757d;
-  color: white;
-  border: none;
-  border-radius: 6px;
-  font-size: 0.9em;
-  cursor: pointer;
-  transition: background-color 0.3s;
-}
-
-.settings-btn:hover {
-  background: #5a6268;
-}
-
-.room-details {
-  display: flex;
-  flex-direction: column;
-  gap: 16px;
-}
-
-.detail-item {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-}
-
-.detail-label {
-  font-weight: 600;
-  color: #333;
-  min-width: 80px;
-  font-size: 0.95em;
-}
-
-.detail-content {
-  color: #666;
-  flex: 1;
-  font-size: 0.95em;
-}
-
-.members-section {
-  background: white;
-  border-radius: 16px;
-  padding: 24px;
-  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.08);
-  border: 1px solid #e9ecef;
-}
-
-.section-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  margin-bottom: 20px;
-}
-
-.section-title {
-  font-size: 1.4em;
-  color: #333;
-  font-weight: 600;
-  margin: 0;
-}
-
-.member-count-total {
-  background: #f8f9fa;
-  padding: 4px 12px;
-  border-radius: 12px;
-  font-size: 0.9em;
-  color: #666;
-}
-
-.members-table {
-  display: flex;
-  flex-direction: column;
-  gap: 24px;
-}
-
-.status-header {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  padding: 12px 0;
-  border-bottom: 2px solid;
-  margin-bottom: 16px;
-}
-
-.status-header.focusing {
-  border-color: #eeaa67;
-}
-
-.status-header.resting {
-  border-color: #6c757d;
-}
-
-.status-text {
-  font-size: 1.1em;
-  font-weight: 600;
-  color: #333;
-}
-
-.member-count {
-  background: #f8f9fa;
-  padding: 4px 12px;
-  border-radius: 12px;
-  font-size: 0.9em;
-  color: #666;
-  margin-left: auto;
-}
-
-.members-grid {
-  display: grid;
-  grid-template-columns: 1fr;
-  gap: 12px;
-}
-
-.member-card {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  padding: 16px;
-  border-radius: 12px;
-  transition: all 0.3s ease;
-}
-
-.member-card.focusing {
-  background: #fff9f2;
+  border-radius: 20px;
+  box-shadow: 0 10px 40px rgba(0, 0, 0, 0.1);
   border: 1px solid #ffe4cc;
 }
 
-.member-card.resting {
-  background: #f8f9fa;
-  border: 1px solid #e9ecef;
-}
-
-.member-card:hover {
-  transform: translateY(-2px);
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
-}
-
-.member-avatar {
-  width: 40px;
-  height: 40px;
-  border-radius: 50%;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  overflow: hidden;
-  flex-shrink: 0;
-}
-
-.avatar-placeholder {
-  width: 100%;
-  height: 100%;
-  background: linear-gradient(135deg, #eeaa67, #f5b877);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  color: white;
-  font-weight: 600;
-  font-size: 0.9em;
-}
-
-.member-info {
-  flex: 1;
-  min-width: 0;
-}
-
-.member-name {
-  font-weight: 600;
-  color: #333;
-  margin-bottom: 4px;
-  font-size: 0.95em;
-}
-
-.focus-time,
-.rest-time {
-  font-size: 0.85em;
-  color: #666;
-}
-
-.member-tag {
-  padding: 4px 8px;
-  border-radius: 6px;
-  font-size: 0.8em;
-  font-weight: 500;
-  flex-shrink: 0;
-}
-
-.focusing-tag {
-  background: #e7f3ff;
-  color: #1971c2;
-}
-
-.resting-tag {
-  background: #f8f9fa;
-  color: #6c757d;
-}
-
-.study-tools-section {
-  background: white;
-  border-radius: 16px;
-  padding: 24px;
-  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.08);
-  border: 1px solid #e9ecef;
-}
-
-.tools-header {
+.not-found-icon {
+  font-size: 4em;
   margin-bottom: 20px;
+  opacity: 0.7;
 }
 
-.tools-title {
-  font-size: 1.4em;
+.not-found-title {
+  font-size: 2em;
   color: #333;
-  font-weight: 600;
-  margin: 0;
+  font-weight: 700;
+  margin: 0 0 16px 0;
 }
 
-.tomato-timer-placeholder {
-  background: #f8f9fa;
-  border-radius: 12px;
-  padding: 30px 20px;
-  text-align: center;
-  margin-bottom: 20px;
-  border: 2px dashed #e9ecef;
-}
-
-.placeholder-content h3 {
-  margin: 0 0 8px 0;
-  color: #333;
-  font-size: 1.3em;
-}
-
-.placeholder-content p {
-  margin: 0 0 20px 0;
+.not-found-message {
+  font-size: 1.1em;
   color: #666;
-  font-size: 0.95em;
+  margin: 0 0 32px 0;
+  line-height: 1.6;
 }
 
-.timer-controls {
+.not-found-message strong {
+  color: #eeaa67;
+  font-weight: 600;
+}
+
+.not-found-actions {
   display: flex;
+  gap: 16px;
   justify-content: center;
-  gap: 12px;
-}
-
-.tomato-btn {
-  padding: 12px 24px;
-  border: none;
-  border-radius: 8px;
-  font-size: 1em;
-  font-weight: 600;
-  cursor: pointer;
-  transition: all 0.3s ease;
-}
-
-.start-tomato {
-  background: #28a745;
-  color: white;
-}
-
-.start-tomato:hover {
-  background: #218838;
-  transform: translateY(-2px);
-}
-
-.stop-tomato {
-  background: #dc3545;
-  color: white;
-}
-
-.stop-tomato:hover {
-  background: #c82333;
-  transform: translateY(-2px);
-}
-
-.other-tools-placeholder {
-  background: #f8f9fa;
-  border-radius: 12px;
-  padding: 20px;
-  text-align: center;
-  color: #666;
-  border: 1px dashed #dee2e6;
-  font-size: 0.95em;
-}
-
-.action-section {
-  position: sticky;
-  top: 100px;
-  height: fit-content;
-}
-
-.action-card {
-  background: white;
-  border-radius: 16px;
-  padding: 24px;
-  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.08);
-  border: 1px solid #e9ecef;
-}
-
-.action-header {
-  margin-bottom: 20px;
-}
-
-.action-title {
-  font-size: 1.4em;
-  color: #333;
-  font-weight: 600;
-  margin: 0;
-}
-
-.action-buttons {
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
-  margin-bottom: 25px;
 }
 
 .action-btn {
-  width: 100%;
-  padding: 14px 20px;
-  border: 2px solid #e9ecef;
+  padding: 14px 28px;
+  border: none;
   border-radius: 10px;
-  background: white;
-  color: #666;
   font-size: 1em;
   font-weight: 500;
   cursor: pointer;
   transition: all 0.3s ease;
-  display: flex;
-  align-items: center;
-  justify-content: center;
+  min-width: 140px;
 }
 
-.leave-btn:hover {
-  background: #fff5f5;
-  border-color: #ff6b6b;
-  color: #ff6b6b;
-  transform: translateY(-1px);
-}
-
-.owner-actions {
-  margin-top: 15px;
-  padding-top: 15px;
-  border-top: 1px solid #e9ecef;
-}
-
-.owner-btn {
-  background: #ffc107;
-  color: #212529;
-  margin-bottom: 8px;
-  border: none;
-}
-
-.owner-btn:hover {
-  background: #e0a800;
-  transform: translateY(-1px);
-}
-
-.room-stats {
-  display: grid;
-  grid-template-columns: repeat(3, 1fr);
-  gap: 16px;
-  padding-top: 20px;
-  border-top: 1px solid #e9ecef;
-}
-
-.stat-item {
-  text-align: center;
-}
-
-.stat-value {
-  font-size: 1.8em;
-  font-weight: 700;
-  color: #eeaa67;
-  margin-bottom: 4px;
-}
-
-.stat-label {
-  font-size: 0.85em;
-  color: #666;
-}
-
-.modal-overlay {
-  position: fixed;
-  top: 0;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  background: rgba(0, 0, 0, 0.5);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  z-index: 1000;
-}
-
-.settings-modal {
-  background: white;
-  padding: 30px;
-  border-radius: 12px;
-  max-width: 400px;
-  width: 90%;
-  text-align: center;
-}
-
-.settings-modal h3 {
-  margin: 0 0 16px 0;
-  color: #333;
-}
-
-.settings-modal p {
-  margin: 0 0 20px 0;
-  color: #666;
-}
-
-.settings-modal button {
-  padding: 10px 20px;
-  background: #6c757d;
+.primary-btn {
+  background: linear-gradient(135deg, #eeaa67, #f5b877);
   color: white;
+}
+
+.primary-btn:hover {
+  background: linear-gradient(135deg, #e69c55, #f0b066);
+  transform: translateY(-2px);
+  box-shadow: 0 4px 15px rgba(238, 170, 103, 0.3);
+}
+
+.secondary-btn {
+  background: white;
+  color: #666;
+  border: 2px solid #e0e0e0;
+}
+
+.secondary-btn:hover {
+  background: #f8f9fa;
+  border-color: #ccc;
+  transform: translateY(-2px);
+}
+</style>
+
+<style scoped>
+/* 保持你原有的所有样式，只添加以下新样式 */
+
+/* 房间不存在提示容器 */
+.room-not-found-container {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: calc(100vh - 80px); /* 减去导航栏高度 */
+  padding: 40px 20px;
+  background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%);
+}
+
+.not-found-content {
+  text-align: center;
+  max-width: 500px;
+  width: 100%;
+  padding: 40px;
+  background: white;
+  border-radius: 20px;
+  box-shadow: 0 10px 40px rgba(0, 0, 0, 0.1);
+  border: 1px solid #ffe4cc;
+}
+
+.not-found-icon {
+  font-size: 4em;
+  margin-bottom: 20px;
+  opacity: 0.7;
+}
+
+.not-found-title {
+  font-size: 2em;
+  color: #333;
+  font-weight: 700;
+  margin: 0 0 16px 0;
+}
+
+.not-found-message {
+  font-size: 1.1em;
+  color: #666;
+  margin: 0 0 32px 0;
+  line-height: 1.6;
+}
+
+.not-found-message strong {
+  color: #eeaa67;
+  font-weight: 600;
+}
+
+.not-found-actions {
+  display: flex;
+  gap: 16px;
+  justify-content: center;
+}
+
+.action-btn {
+  padding: 14px 28px;
   border: none;
-  border-radius: 6px;
+  border-radius: 10px;
+  font-size: 1em;
+  font-weight: 500;
   cursor: pointer;
+  transition: all 0.3s ease;
+  min-width: 140px;
 }
 
-.settings-modal button:hover {
-  background: #5a6268;
+.primary-btn {
+  background: linear-gradient(135deg, #eeaa67, #f5b877);
+  color: white;
 }
 
-@media (max-width: 1200px) {
-  .main-layout {
-    grid-template-columns: 280px 1fr;
-  }
-  .action-section {
-    grid-column: 1 / -1;
-  }
+.primary-btn:hover {
+  background: linear-gradient(135deg, #e69c55, #f0b066);
+  transform: translateY(-2px);
+  box-shadow: 0 4px 15px rgba(238, 170, 103, 0.3);
 }
 
-@media (max-width: 768px) {
-  .main-layout {
-    grid-template-columns: 1fr;
-  }
-  
-  .room-title {
-    font-size: 2em;
-  }
-  
-  .study-room-content {
-    padding: 20px;
-  }
-  
-  .room-header {
-    flex-direction: column;
-    gap: 12px;
-  }
-  
-  .section-header {
-    flex-direction: column;
-    align-items: flex-start;
-    gap: 12px;
-  }
-  
-  .members-grid {
-    grid-template-columns: 1fr;
-  }
+.secondary-btn {
+  background: white;
+  color: #666;
+  border: 2px solid #e0e0e0;
+}
+
+.secondary-btn:hover {
+  background: #f8f9fa;
+  border-color: #ccc;
+  transform: translateY(-2px);
+}
+
+/* 修改加载提示文字 */
+.loading-container p {
+  color: #666;
+  font-size: 1.1em;
+  margin-top: 16px;
 }
 </style>
