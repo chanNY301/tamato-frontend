@@ -37,7 +37,12 @@
 
     <main class="main-grid">
       <aside class="friends-list-area">
-        <FriendList />
+        <div class="friends-list-wrapper">
+          <FriendList />
+        </div>
+        <div class="task-sidebar-wrapper">
+          <TaskSidebar @task-status-changed="handleTaskStatusChange" />
+        </div>
       </aside>
 
       <section class="content-area">
@@ -69,6 +74,9 @@
       </section>
 
       <aside class="right-sidebar">
+        <!-- 每日签到组件 -->
+        <DailyCheckIn @checkin-success="handleCheckInSuccess" />
+        
         <div class="sticky-buttons">
           <button class="btn-primary" @click="createRoom">
             <span class="btn-icon"></span>
@@ -79,8 +87,6 @@
             加入自习室
           </button>
         </div>
-        
-        <TaskSidebar @task-status-changed="handleTaskStatusChange" />
       </aside>
     </main>
   </div>
@@ -95,6 +101,8 @@ import TaskSidebar from '@/components/TaskSidebar/TaskSidebar.vue'
 import QuickJoin from '@/components/QuickJoin/QuickJoin.vue'
 // 【新增】导入 FriendList 组件
 import FriendList from '@/components/FriendList/FriendList.vue'
+// 导入每日签到组件
+import DailyCheckIn from '@/components/DailyCheckIn/DailyCheckIn.vue'
 
 export default {
   name: 'HomeView',
@@ -102,7 +110,8 @@ export default {
     // 【新增】注册 FriendList 组件
     FriendList,
     TaskSidebar,
-    QuickJoin
+    QuickJoin,
+    DailyCheckIn
   },
   data() {
     return {
@@ -122,6 +131,7 @@ export default {
       // 海报轮播数据 - 初始为空数组，将在created钩子中动态加载
       posters: [],
       currentPosterIndex: 0,
+      carouselTimer: null, // 自动轮播定时器
       
       // 快速加入房间的假数据
       quickJoinRooms: [
@@ -167,6 +177,16 @@ export default {
     this.fetchUserInfo()
   },
   
+  mounted() {
+    // 启动自动轮播
+    this.startCarousel()
+  },
+  
+  beforeUnmount() {
+    // 组件销毁前清除定时器
+    this.stopCarousel()
+  },
+  
   // 当路由激活时，重新获取用户信息（从个人中心返回时刷新头像）
   activated() {
     this.fetchUserInfo()
@@ -174,6 +194,13 @@ export default {
     if (this.$refs.taskSidebar) {
       this.$refs.taskSidebar.refreshTasks()
     }
+    // 重新启动自动轮播
+    this.startCarousel()
+  },
+  
+  deactivated() {
+    // 路由失活时停止轮播
+    this.stopCarousel()
   },
   methods: {
     // 获取用户信息
@@ -232,6 +259,11 @@ export default {
         this.posters = loadedPosters.filter(poster => poster !== null)
         
         console.log(`成功加载 ${this.posters.length} 张海报`)
+        
+        // 如果海报加载完成且组件已挂载，启动自动轮播
+        if (this.posters.length > 1 && this.$el) {
+          this.startCarousel()
+        }
         
       } catch (error) {
         console.error('加载海报时出错:', error)
@@ -308,14 +340,43 @@ export default {
     nextPoster() {
       if (this.posters.length === 0) return
       this.currentPosterIndex = (this.currentPosterIndex + 1) % this.posters.length
+      // 重置自动轮播定时器
+      this.resetCarousel()
     },
     prevPoster() {
       if (this.posters.length === 0) return
       this.currentPosterIndex = (this.currentPosterIndex - 1 + this.posters.length) % this.posters.length
+      // 重置自动轮播定时器
+      this.resetCarousel()
     },
     switchPoster(index) {
       if (this.posters.length === 0) return
       this.currentPosterIndex = index
+      // 重置自动轮播定时器
+      this.resetCarousel()
+    },
+    
+    // 启动自动轮播
+    startCarousel() {
+      if (this.posters.length <= 1) return // 只有一张或没有海报时不启动
+      this.stopCarousel() // 先清除可能存在的定时器
+      this.carouselTimer = setInterval(() => {
+        this.nextPoster()
+      }, 4000) // 每4秒切换一次
+    },
+    
+    // 停止自动轮播
+    stopCarousel() {
+      if (this.carouselTimer) {
+        clearInterval(this.carouselTimer)
+        this.carouselTimer = null
+      }
+    },
+    
+    // 重置自动轮播（手动切换后重新计时）
+    resetCarousel() {
+      this.stopCarousel()
+      this.startCarousel()
     },
     
     // 创建自习室
@@ -345,6 +406,12 @@ export default {
         name: 'study-room',
         params: { roomId: roomId }
       })
+    },
+
+    handleCheckInSuccess(data) {
+      console.log('签到成功:', data)
+      // 可以在这里显示成功提示或更新其他数据
+      // 例如：更新用户资产信息、显示通知等
     }
   }
 }
@@ -430,11 +497,26 @@ export default {
   height: fit-content;
   position: sticky;
   top: 100px;
+  max-height: calc(100vh - 120px);
+  overflow-y: auto;
+}
+
+.friends-list-wrapper {
+  flex: 0 0 auto;
+  max-height: 40vh; /* 限制好友列表最大高度为视口高度的40% */
+  min-height: 200px;
+  overflow-y: auto;
+}
+
+.task-sidebar-wrapper {
+  flex: 1 1 auto; /* 待办任务占据剩余空间 */
+  min-height: 300px;
+  overflow-y: auto;
 }
 
 /* 移除原有的 widget-placeholder 样式，现在由 FriendList 组件内部处理 */
 
-/* 海报轮播 (保持不变) */
+/* 海报轮播 */
 .poster-carousel {
   position: relative;
   background: white;
@@ -442,14 +524,21 @@ export default {
   overflow: hidden;
   box-shadow: 0 4px 8px rgba(238, 170, 103, 0.1); /* 橘黄色阴影 */
   border: 1px solid #ffe4cc; /* 橘黄色边框 */
+  height: 400px; /* 固定高度 */
 }
 
 .poster-slide {
-  height: 400px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  background: linear-gradient(135deg, #fef6f0 0%, #ffe4cc 100%); /* 橘黄色渐变背景 */
+  width: 100%;
+  height: 100%;
+  position: relative;
+  overflow: hidden;
+}
+
+.poster-image {
+  width: 100%;
+  height: 100%;
+  object-fit: cover; /* 填满容器，保持比例 */
+  display: block;
 }
 
 /* 快速加入区域 */
@@ -602,41 +691,44 @@ export default {
   gap: 20px;
 }
 
-.poster-image {
-  max-width: 90%;
-  max-height: 90%;
-  object-fit: contain;
-  border-radius: 8px;
-}
 
 .carousel-arrow {
   position: absolute;
   top: 50%;
   transform: translateY(-50%);
-  background: rgba(0,0,0,0.5);
-  color: white;
+  background: rgba(255, 255, 255, 0.6); /* 半透明白色背景 */
+  backdrop-filter: blur(4px); /* 毛玻璃效果 */
+  color: #333;
   border: none;
-  width: 40px;
-  height: 40px;
+  width: 45px;
+  height: 45px;
   border-radius: 50%;
   cursor: pointer;
-  font-size: 1.5em;
+  font-size: 1.8em;
   display: flex;
   align-items: center;
   justify-content: center;
-  transition: background-color 0.3s;
+  transition: all 0.3s ease;
+  z-index: 10;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
 }
 
 .left-arrow {
-  left: 15px;
+  left: 20px;
 }
 
 .right-arrow {
-  right: 15px;
+  right: 20px;
 }
 
 .carousel-arrow:hover {
-  background: rgba(0,0,0,0.7);
+  background: rgba(255, 255, 255, 0.9); /* 悬停时更不透明 */
+  transform: translateY(-50%) scale(1.1);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.25);
+}
+
+.carousel-arrow:active {
+  transform: translateY(-50%) scale(0.95);
 }
 
 .carousel-indicators {

@@ -9,17 +9,123 @@
     </nav>
 
     <main class="main-content">
-      <!-- 页面标题 -->
-      <div class="page-header">
-        <h1 class="page-title">好友管理</h1>
-        <p class="page-subtitle">搜索用户、管理好友关系</p>
-      </div>
-
       <div class="friends-layout">
-        <!-- 左侧：搜索和好友申请 -->
-        <div class="left-section">
+        <!-- 左侧：导航栏和好友列表 -->
+        <aside class="left-sidebar">
+          <!-- 导航栏 -->
+          <div class="sidebar-nav">
+            <h2 class="nav-title">好友管理</h2>
+            <div class="nav-menu">
+              <button 
+                :class="['nav-item', { active: activeTab === 'friends' }]"
+                @click="activeTab = 'friends'"
+              >
+                <span class="nav-icon">👥</span>
+                我的好友
+              </button>
+              <button 
+                :class="['nav-item', { active: activeTab === 'search' }]"
+                @click="activeTab = 'search'"
+              >
+                <span class="nav-icon">🔍</span>
+                搜索用户
+              </button>
+              <button 
+                :class="['nav-item', { active: activeTab === 'requests' }]"
+                @click="activeTab = 'requests'"
+              >
+                <span class="nav-icon">📬</span>
+                好友申请
+                <span v-if="friendRequests.length > 0" class="nav-badge">{{ friendRequests.length }}</span>
+              </button>
+            </div>
+          </div>
+
+          <!-- 好友列表 -->
+          <div class="friends-list-container">
+            <div class="friends-list-header">
+              <h3>我的好友 ({{ friendsList.length }})</h3>
+              <button @click="refreshFriends" class="refresh-btn" :disabled="loadingFriends" title="刷新">
+                <span v-if="loadingFriends">⏳</span>
+                <span v-else>🔄</span>
+              </button>
+            </div>
+            
+            <div v-if="loadingFriends" class="loading-state">
+              <div class="spinner"></div>
+              <p>加载中...</p>
+            </div>
+            <div v-else-if="friendsList.length === 0" class="empty-state">
+              <div class="empty-icon">👥</div>
+              <p>暂无好友</p>
+            </div>
+            <div v-else class="friends-list-scroll">
+              <div 
+                v-for="friend in friendsList" 
+                :key="friend.friend_id || friend.id"
+                class="friend-card-expanded"
+                :class="{ 'selected': selectedFriend && selectedFriend.friend_id === friend.friend_id }"
+                @click="selectFriend(friend)"
+              >
+                <div class="friend-avatar-wrapper">
+                  <div class="friend-avatar">
+                    <img 
+                      :src="getAvatarUrl(friend.friend_avatar || friend.avatar)" 
+                      alt="好友头像"
+                      @error="handleAvatarError"
+                    />
+                  </div>
+                  <span :class="['online-indicator', friend.isOnline ? 'online' : 'offline']"></span>
+                </div>
+                
+                <div class="friend-details">
+                  <h4 class="friend-name">{{ friend.friend_name || friend.friend_username || friend.username }}</h4>
+                  
+                  <div class="friend-status-info">
+                    <span :class="['status-badge', getStatusClass(friend.friend_status || friend.status)]">
+                      {{ friend.friend_status || friend.status || '离线' }}
+                    </span>
+                    <span v-if="friend.tomatoStatus" :class="['tomato-status', friend.tomatoStatus]">
+                      {{ getTomatoStatusText(friend.tomatoStatus) }}
+                    </span>
+                  </div>
+                  
+                  <div v-if="friend.currentTask" class="current-task-info">
+                    <span class="task-icon">📚</span>
+                    <span class="task-text">{{ friend.currentTask }}</span>
+                  </div>
+                  
+                  <div v-if="friend.countdown" class="countdown-info">
+                    <span class="countdown-icon">⏱️</span>
+                    <span class="countdown-text">剩余：{{ friend.countdown }}</span>
+                  </div>
+                </div>
+                
+                <div class="friend-actions">
+                  <button 
+                    @click.stop="showFriendOverview(friend)"
+                    class="btn-view-info"
+                    title="查看详细信息"
+                  >
+                    ℹ️
+                  </button>
+                  <button 
+                    @click.stop="showDeleteConfirm(friend)"
+                    class="btn-delete-friend"
+                    title="删除好友"
+                  >
+                    🗑️
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        </aside>
+
+        <!-- 右侧：主要内容区域 -->
+        <div class="right-content">
           <!-- 搜索用户 -->
-          <div class="search-section">
+          <div v-if="activeTab === 'search'" class="content-section">
             <h2 class="section-title">搜索用户</h2>
             <div class="search-box">
               <input 
@@ -73,13 +179,14 @@
           </div>
 
           <!-- 好友申请 -->
-          <div class="requests-section">
+          <div v-if="activeTab === 'requests'" class="content-section">
             <h2 class="section-title">好友申请</h2>
             <div v-if="loadingRequests" class="loading-state">
               <div class="spinner"></div>
               <p>加载中...</p>
             </div>
             <div v-else-if="friendRequests.length === 0" class="empty-state">
+              <div class="empty-icon">📬</div>
               <p>暂无好友申请</p>
             </div>
             <div v-else class="requests-list">
@@ -119,59 +226,319 @@
               </div>
             </div>
           </div>
-        </div>
 
-        <!-- 右侧：好友列表 -->
-        <div class="right-section">
-          <div class="friends-list-section">
-            <div class="section-header">
-              <h2 class="section-title">我的好友</h2>
-              <button @click="refreshFriends" class="refresh-btn" :disabled="loadingFriends">
-                {{ loadingFriends ? '刷新中...' : '🔄' }}
+          <!-- 好友主页 -->
+          <div v-if="activeTab === 'friends' && selectedFriend" class="content-section">
+            <!-- 好友主页头部 -->
+            <div class="friend-profile-header">
+              <div class="profile-avatar">
+                <img 
+                  :src="getAvatarUrl(selectedFriend.friend_avatar || selectedFriend.avatar)" 
+                  alt="好友头像"
+                  @error="handleAvatarError"
+                />
+                <span :class="['online-indicator-large', selectedFriend.isOnline ? 'online' : 'offline']"></span>
+              </div>
+              <div class="profile-info">
+                <h2 class="profile-name">{{ selectedFriend.friend_name || selectedFriend.friend_username || selectedFriend.username }}</h2>
+                <div class="profile-status-row">
+                  <span :class="['status-badge-large', getStatusClass(selectedFriend.friend_status || selectedFriend.status)]">
+                    {{ selectedFriend.friend_status || selectedFriend.status || '离线' }}
+                  </span>
+                  <span v-if="selectedFriend.tomatoStatus" :class="['tomato-status-large', selectedFriend.tomatoStatus]">
+                    {{ getTomatoStatusText(selectedFriend.tomatoStatus) }}
+                  </span>
+                </div>
+              </div>
+            </div>
+
+            <!-- 导航栏 -->
+            <div class="profile-nav">
+              <button 
+                :class="['nav-tab', { active: friendSubTab === 'info' }]"
+                @click="friendSubTab = 'info'"
+              >
+                <span class="tab-icon">👤</span>
+                个人信息
+              </button>
+              <button 
+                :class="['nav-tab', { active: friendSubTab === 'stats' }]"
+                @click="friendSubTab = 'stats'; loadFriendStats()"
+              >
+                <span class="tab-icon">📊</span>
+                学习统计
               </button>
             </div>
 
-            <div v-if="loadingFriends" class="loading-state">
-              <div class="spinner"></div>
-              <p>加载中...</p>
-            </div>
-            <div v-else-if="friendsList.length === 0" class="empty-state">
-              <div class="empty-icon">👥</div>
-              <h3>暂无好友</h3>
-              <p>搜索用户并发送好友申请吧</p>
-            </div>
-            <div v-else class="friends-list">
-              <div 
-                v-for="friend in friendsList" 
-                :key="friend.friend_id"
-                class="friend-item"
-              >
-                <div class="friend-avatar">
-                  <img 
-                    :src="getAvatarUrl(friend.friend_avatar || friend.avatar)" 
-                    alt="好友头像"
-                    @error="handleAvatarError"
-                  />
-                </div>
-                <div class="friend-info">
-                  <h4 class="friend-name">{{ friend.friend_name || friend.friend_username }}</h4>
-                  <div class="friend-status">
-                    <span :class="['status-dot', getStatusClass(friend.friend_status)]"></span>
-                    <span>{{ friend.friend_status || '未知' }}</span>
+            <!-- 个人信息标签页 -->
+            <div v-if="friendSubTab === 'info'" class="profile-content">
+              <div class="info-section">
+                <h3 class="info-section-title">基本信息</h3>
+                <div class="info-grid">
+                  <div class="info-item">
+                    <span class="info-label">用户ID</span>
+                    <span class="info-value">{{ selectedFriend.friend_id || selectedFriend.user_id }}</span>
+                  </div>
+                  <div class="info-item">
+                    <span class="info-label">用户名</span>
+                    <span class="info-value">{{ selectedFriend.friend_name || selectedFriend.friend_username || selectedFriend.username }}</span>
+                  </div>
+                  <div class="info-item">
+                    <span class="info-label">在线状态</span>
+                    <span :class="['info-value', 'status-value', getStatusClass(selectedFriend.friend_status || selectedFriend.status)]">
+                      {{ selectedFriend.friend_status || selectedFriend.status || '离线' }}
+                    </span>
+                  </div>
+                  <div v-if="selectedFriend.tomatoStatus" class="info-item">
+                    <span class="info-label">番茄钟状态</span>
+                    <span :class="['info-value', 'tomato-value', selectedFriend.tomatoStatus]">
+                      {{ getTomatoStatusText(selectedFriend.tomatoStatus) }}
+                    </span>
                   </div>
                 </div>
-                <button 
-                  @click="showDeleteConfirm(friend)"
-                  class="btn-delete"
-                >
-                  删除
-                </button>
               </div>
+
+              <div v-if="selectedFriend.currentTask || selectedFriend.countdown" class="info-section">
+                <h3 class="info-section-title">当前活动</h3>
+                <div class="activity-card">
+                  <div v-if="selectedFriend.currentTask" class="activity-item">
+                    <span class="activity-icon">📚</span>
+                    <div class="activity-content">
+                      <span class="activity-label">正在学习</span>
+                      <span class="activity-value">{{ selectedFriend.currentTask }}</span>
+                    </div>
+                  </div>
+                  <div v-if="selectedFriend.countdown" class="activity-item">
+                    <span class="activity-icon">⏱️</span>
+                    <div class="activity-content">
+                      <span class="activity-label">剩余时间</span>
+                      <span class="activity-value countdown-display">{{ selectedFriend.countdown }}</span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <!-- 学习统计标签页 -->
+            <div v-if="friendSubTab === 'stats'" class="profile-content">
+              <div v-if="loadingStats" class="loading-state">
+                <div class="spinner"></div>
+                <p>加载统计数据中...</p>
+              </div>
+              <div v-else>
+                <!-- 今日统计 -->
+                <div class="stat-card-overview">
+                  <div class="stat-item">
+                    <div class="stat-icon">🍅</div>
+                    <div class="stat-details">
+                      <div class="stat-value">{{ friendStats.todayTomatoes || 0 }}</div>
+                      <div class="stat-label">今日番茄</div>
+                    </div>
+                  </div>
+                </div>
+
+                <!-- 学习时长图表 -->
+                <div class="chart-section">
+                  <h4 class="chart-title">本周学习时长</h4>
+                  <div class="bar-chart">
+                    <div 
+                      v-for="(day, index) in friendStats.weeklyHours" 
+                      :key="index"
+                      class="bar-item"
+                    >
+                      <div class="bar" :style="{ height: getBarHeight(day.hours) + '%' }"></div>
+                      <div class="bar-label">{{ day.day }}</div>
+                      <div class="bar-value">{{ day.hours }}h</div>
+                    </div>
+                  </div>
+                </div>
+
+                <!-- 任务完成数图表 -->
+                <div class="chart-section">
+                  <h4 class="chart-title">本月任务完成数</h4>
+                  <div class="line-chart">
+                    <svg class="chart-svg" viewBox="0 0 400 150">
+                      <polyline
+                        :points="getLineChartPoints(friendStats.monthlyTasks)"
+                        fill="none"
+                        stroke="#eeaa67"
+                        stroke-width="2"
+                      />
+                      <circle
+                        v-for="(task, index) in friendStats.monthlyTasks"
+                        :key="index"
+                        :cx="(index / (friendStats.monthlyTasks.length - 1 || 1)) * 380 + 10"
+                        :cy="150 - (task.count / Math.max(...friendStats.monthlyTasks.map(t => t.count), 1)) * 130"
+                        r="4"
+                        fill="#eeaa67"
+                      />
+                    </svg>
+                    <div class="chart-labels">
+                      <span v-for="(task, index) in friendStats.monthlyTasks" :key="index" class="chart-label">
+                        {{ task.date }}
+                      </span>
+                    </div>
+                  </div>
+                </div>
+
+                <!-- 最常学习的科目 -->
+                <div class="subjects-section">
+                  <h4 class="chart-title">最常学习的科目</h4>
+                  <div class="subject-tags">
+                    <span 
+                      v-for="(subject, index) in friendStats.topSubjects" 
+                      :key="index"
+                      class="subject-tag"
+                    >
+                      {{ subject.name }}
+                      <span class="subject-count">{{ subject.count }}次</span>
+                    </span>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- 默认提示 -->
+          <div v-if="activeTab === 'friends' && !selectedFriend" class="content-section">
+            <div class="welcome-message">
+              <div class="welcome-icon">👋</div>
+              <h2>欢迎使用好友管理</h2>
+              <p>从左侧选择好友查看详细信息，或使用导航栏进行其他操作</p>
             </div>
           </div>
         </div>
       </div>
     </main>
+
+    <!-- 用户不存在提示对话框 -->
+    <div v-if="showUserNotFoundModal" class="modal-overlay" @click="closeUserNotFoundModal">
+      <div class="modal-content user-not-found-modal" @click.stop>
+        <div class="modal-icon">👤</div>
+        <h3 class="modal-title">用户不存在</h3>
+        <p class="modal-message">抱歉，未找到用户 "<strong>{{ searchUsername }}</strong>"</p>
+        <p class="modal-hint">请检查用户名是否正确</p>
+        <div class="form-actions">
+          <button @click="closeUserNotFoundModal" class="confirm-btn">
+            我知道了
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- 好友学习概览模态框 -->
+    <div v-if="showFriendOverviewModal" class="modal-overlay" @click="closeFriendOverview">
+      <div class="modal-content friend-overview-modal" @click.stop>
+        <div class="overview-header">
+          <div class="overview-avatar">
+            <img 
+              :src="getAvatarUrl(selectedFriend?.friend_avatar || selectedFriend?.avatar)" 
+              alt="好友头像"
+              @error="handleAvatarError"
+            />
+          </div>
+          <div class="overview-info">
+            <h3 class="overview-name">{{ selectedFriend?.friend_name || selectedFriend?.friend_username || selectedFriend?.username }}</h3>
+            <span :class="['overview-status', getStatusClass(selectedFriend?.friend_status || selectedFriend?.status)]">
+              {{ selectedFriend?.friend_status || selectedFriend?.status || '离线' }}
+            </span>
+          </div>
+          <button @click="closeFriendOverview" class="close-btn">×</button>
+        </div>
+
+        <div class="overview-content">
+          <!-- 今日统计 -->
+          <div class="stat-card-overview">
+            <div class="stat-item">
+              <div class="stat-icon">🍅</div>
+              <div class="stat-details">
+                <div class="stat-value">{{ friendStats.todayTomatoes || 0 }}</div>
+                <div class="stat-label">今日番茄</div>
+              </div>
+            </div>
+          </div>
+
+          <!-- 学习时长图表 -->
+          <div class="chart-section">
+            <h4 class="chart-title">本周学习时长</h4>
+            <div class="bar-chart">
+              <div 
+                v-for="(day, index) in friendStats.weeklyHours" 
+                :key="index"
+                class="bar-item"
+              >
+                <div class="bar" :style="{ height: getBarHeight(day.hours) + '%' }"></div>
+                <div class="bar-label">{{ day.day }}</div>
+                <div class="bar-value">{{ day.hours }}h</div>
+              </div>
+            </div>
+          </div>
+
+          <!-- 任务完成数图表 -->
+          <div class="chart-section">
+            <h4 class="chart-title">本月任务完成数</h4>
+            <div class="line-chart">
+              <svg class="chart-svg" viewBox="0 0 400 150">
+                <polyline
+                  :points="getLineChartPoints(friendStats.monthlyTasks)"
+                  fill="none"
+                  stroke="#eeaa67"
+                  stroke-width="2"
+                />
+                <circle
+                  v-for="(task, index) in friendStats.monthlyTasks"
+                  :key="index"
+                  :cx="(index / (friendStats.monthlyTasks.length - 1 || 1)) * 380 + 10"
+                  :cy="150 - (task.count / Math.max(...friendStats.monthlyTasks.map(t => t.count), 1)) * 130"
+                  r="4"
+                  fill="#eeaa67"
+                />
+              </svg>
+              <div class="chart-labels">
+                <span v-for="(task, index) in friendStats.monthlyTasks" :key="index" class="chart-label">
+                  {{ task.date }}
+                </span>
+              </div>
+            </div>
+          </div>
+
+          <!-- 最常学习的科目 -->
+          <div class="subjects-section">
+            <h4 class="chart-title">最常学习的科目</h4>
+            <div class="subject-tags">
+              <span 
+                v-for="(subject, index) in friendStats.topSubjects" 
+                :key="index"
+                class="subject-tag"
+              >
+                {{ subject.name }}
+                <span class="subject-count">{{ subject.count }}次</span>
+              </span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 删除好友确认对话框 -->
+    <div v-if="showDeleteModal" class="modal-overlay" @click="closeDeleteModal">
+      <div class="modal-content delete-confirm-modal" @click.stop>
+        <div class="modal-icon">🗑️</div>
+        <h3 class="modal-title">确认删除好友</h3>
+        <p class="modal-message">
+          确定要删除好友 <strong>{{ selectedFriend?.friend_name || selectedFriend?.friend_username || selectedFriend?.username }}</strong> 吗？
+        </p>
+        <p class="modal-hint">此操作不可恢复</p>
+        <div class="form-actions">
+          <button type="button" @click="closeDeleteModal" class="cancel-btn">
+            取消
+          </button>
+          <button @click="confirmDelete" class="confirm-btn delete-confirm-btn" :disabled="deleting">
+            {{ deleting ? '删除中...' : '确认删除' }}
+          </button>
+        </div>
+      </div>
+    </div>
 
     <!-- 发送好友申请弹窗 -->
     <div v-if="showRequestModal" class="modal-overlay" @click="closeRequestModal">
@@ -208,21 +575,6 @@
       </div>
     </div>
 
-    <!-- 删除确认弹窗 -->
-    <div v-if="showDeleteModal" class="modal-overlay" @click="closeDeleteModal">
-      <div class="modal-content" @click.stop>
-        <h3 class="modal-title">确认删除</h3>
-        <p class="modal-message">确定要删除好友 <strong>{{ selectedFriend?.friend_name || selectedFriend?.friend_username }}</strong> 吗？</p>
-        <div class="form-actions">
-          <button type="button" @click="closeDeleteModal" class="cancel-btn">
-            取消
-          </button>
-          <button @click="confirmDelete" class="confirm-btn delete-confirm-btn" :disabled="deleting">
-            {{ deleting ? '删除中...' : '确认删除' }}
-          </button>
-        </div>
-      </div>
-    </div>
   </div>
 </template>
 
@@ -242,16 +594,28 @@ export default {
       searchError: '',
       friendRequests: [],
       loadingRequests: false,
-      friendsList: [],
-      loadingFriends: false,
       showRequestModal: false,
       selectedUser: null,
       requestMessage: '',
       sendingRequest: false,
+      currentUserId: null,
+      showUserNotFoundModal: false,
+      friendsList: [],
+      loadingFriends: false,
+      showFriendOverviewModal: false,
+      friendStats: {
+        todayTomatoes: 0,
+        weeklyHours: [],
+        monthlyTasks: [],
+        topSubjects: []
+      },
       showDeleteModal: false,
-      selectedFriend: null,
       deleting: false,
-      currentUserId: null
+      countdownTimers: {},
+      activeTab: 'friends',
+      selectedFriend: null,
+      friendSubTab: 'info',
+      loadingStats: false
     }
   },
   async mounted() {
@@ -280,31 +644,48 @@ export default {
       this.searching = true
       this.searchError = ''
       this.searchResult = null
+      this.showUserNotFoundModal = false
 
       try {
-        // 由于后端可能没有专门的搜索API，我们直接创建一个用户对象用于发送申请
-        // 如果后端有搜索接口，可以在这里调用
+        // 只有ID存在的用户名才可以被搜索到
         const response = await searchUser(this.searchUsername.trim())
         
         if (response.success && response.data) {
-          this.searchResult = response.data
+          // 确保返回的数据有user_id，只有存在的用户才会被搜索到
+          if (response.data.user_id) {
+            this.searchResult = response.data
+          } else {
+            // 用户不存在，显示对话框
+            this.showUserNotFoundModal = true
+          }
         } else {
-          this.searchError = response.message || '用户不存在'
+          // 用户不存在，显示对话框
+          this.showUserNotFoundModal = true
         }
       } catch (error) {
         console.error('搜索用户失败:', error)
-        // 如果搜索接口不存在，创建一个简单的用户对象用于发送申请
-        // 实际发送申请时，后端会验证用户是否存在
-        this.searchResult = {
-          username: this.searchUsername.trim(),
-          user_id: null,
-          status: '未知',
-          avatar: null
+        // 检查是否是404错误（用户不存在）或网络错误
+        if (error.status === 404 || error.message.includes('404') || 
+            error.message.includes('用户不存在') || 
+            error.message.includes('not found')) {
+          // 用户不存在，显示对话框
+          this.showUserNotFoundModal = true
+        } else if (error.isNetworkError || error.message.includes('ECONNREFUSED') || 
+                   error.message.includes('无法连接到服务器')) {
+          // 网络连接错误
+          this.searchError = '无法连接到服务器，请确保后端服务正在运行 (http://localhost:8090)'
+        } else {
+          // 其他错误
+          this.searchError = error.message || '搜索失败，请稍后重试'
         }
-        this.searchError = ''
       } finally {
         this.searching = false
       }
+    },
+
+    closeUserNotFoundModal() {
+      this.showUserNotFoundModal = false
+      this.searchUsername = ''
     },
 
     showSendRequestModal(user) {
@@ -377,6 +758,7 @@ export default {
           alert(action === 'accept' ? '已接受好友申请' : '已拒绝好友申请')
           await this.loadFriendRequests()
           if (action === 'accept') {
+            // 接受好友申请后，刷新好友列表
             await this.loadFriends()
           }
         } else {
@@ -388,15 +770,25 @@ export default {
       }
     },
 
+
+
     async loadFriends() {
       this.loadingFriends = true
       try {
         const response = await getFriends()
         
         if (response.success === true || response.success === "true" || response.code === 200) {
-          this.friendsList = response.data || []
+          this.friendsList = (response.data || []).map(friend => ({
+            ...friend,
+            isOnline: (friend.friend_status || friend.status) === '在线' || (friend.friend_status || friend.status) === '专注中',
+            tomatoStatus: this.getTomatoStatus(friend),
+            currentTask: this.getCurrentTask(friend),
+            countdown: null
+          }))
+          
+          // 启动倒计时更新
+          this.startCountdownTimers()
         } else {
-          console.error('获取好友列表失败:', response.message)
           this.friendsList = []
         }
       } catch (error) {
@@ -407,9 +799,140 @@ export default {
       }
     },
 
+    getTomatoStatus(friend) {
+      // 根据好友状态判断番茄钟状态
+      const status = friend.friend_status || friend.status
+      if (status === '专注中') return 'studying'
+      if (status === '在线') return 'resting'
+      return 'idle'
+    },
+
+    getCurrentTask(friend) {
+      // 这里可以从好友数据中获取当前任务，暂时返回模拟数据
+      if ((friend.friend_status || friend.status) === '专注中') {
+        return friend.current_task || '正在专注学习'
+      }
+      return null
+    },
+
+    getTomatoStatusText(status) {
+      const statusMap = {
+        'studying': '学习中',
+        'resting': '休息中',
+        'idle': '空闲'
+      }
+      return statusMap[status] || '空闲'
+    },
+
+    startCountdownTimers() {
+      // 为每个正在学习的好友启动倒计时
+      this.friendsList.forEach(friend => {
+        if (friend.tomatoStatus === 'studying') {
+          this.updateCountdown(friend)
+        }
+      })
+    },
+
+    updateCountdown(friend) {
+      // 模拟倒计时，实际应该从后端获取
+      if (friend.tomatoStatus === 'studying') {
+        let seconds = 25 * 60 // 25分钟番茄钟
+        const timer = setInterval(() => {
+          seconds--
+          if (seconds <= 0) {
+            clearInterval(timer)
+            friend.countdown = null
+            friend.tomatoStatus = 'resting'
+          } else {
+            const minutes = Math.floor(seconds / 60)
+            const secs = seconds % 60
+            friend.countdown = `${minutes}:${secs.toString().padStart(2, '0')}`
+          }
+        }, 1000)
+        this.countdownTimers[friend.friend_id] = timer
+      }
+    },
+
+    selectFriend(friend) {
+      this.selectedFriend = friend
+      this.activeTab = 'friends'
+      this.friendSubTab = 'info' // 默认显示个人信息
+    },
+
+    showFriendOverview(friend) {
+      this.selectedFriend = friend
+      this.loadFriendStats()
+      this.showFriendOverviewModal = true
+    },
+
     refreshFriends() {
       this.loadFriends()
       this.loadFriendRequests()
+    },
+
+    closeFriendOverview() {
+      this.showFriendOverviewModal = false
+      this.selectedFriend = null
+    },
+
+    async loadFriendStats() {
+      if (!this.selectedFriend) return
+      
+      this.loadingStats = true
+      // 加载好友学习统计数据
+      // 这里使用模拟数据，实际应该调用后端API
+      // 可以根据selectedFriend获取真实数据
+      try {
+        // 模拟API调用延迟
+        await new Promise(resolve => setTimeout(resolve, 500))
+        
+        this.friendStats = {
+          todayTomatoes: Math.floor(Math.random() * 10) + 1,
+          weeklyHours: [
+            { day: '周一', hours: Math.floor(Math.random() * 8) + 1 },
+            { day: '周二', hours: Math.floor(Math.random() * 8) + 1 },
+            { day: '周三', hours: Math.floor(Math.random() * 8) + 1 },
+            { day: '周四', hours: Math.floor(Math.random() * 8) + 1 },
+            { day: '周五', hours: Math.floor(Math.random() * 8) + 1 },
+            { day: '周六', hours: Math.floor(Math.random() * 8) + 1 },
+            { day: '周日', hours: Math.floor(Math.random() * 8) + 1 }
+          ],
+          monthlyTasks: [
+            { date: '1', count: Math.floor(Math.random() * 10) + 1 },
+            { date: '5', count: Math.floor(Math.random() * 10) + 1 },
+            { date: '10', count: Math.floor(Math.random() * 10) + 1 },
+            { date: '15', count: Math.floor(Math.random() * 10) + 1 },
+            { date: '20', count: Math.floor(Math.random() * 10) + 1 },
+            { date: '25', count: Math.floor(Math.random() * 10) + 1 },
+            { date: '30', count: Math.floor(Math.random() * 10) + 1 }
+          ],
+          topSubjects: [
+            { name: '离散数学', count: 15 },
+            { name: '数据结构', count: 12 },
+            { name: '算法分析', count: 8 }
+          ]
+        }
+      } catch (error) {
+        console.error('加载统计数据失败:', error)
+      } finally {
+        this.loadingStats = false
+      }
+    },
+
+    getBarHeight(hours) {
+      if (!this.friendStats.weeklyHours || this.friendStats.weeklyHours.length === 0) return 0
+      const maxHours = Math.max(...this.friendStats.weeklyHours.map(d => d.hours), 1)
+      return (hours / maxHours) * 100
+    },
+
+    getLineChartPoints(tasks) {
+      if (!tasks || tasks.length === 0) return ''
+      const maxCount = Math.max(...tasks.map(t => t.count), 1)
+      return tasks.map((task, index) => {
+        const x = (index / (tasks.length - 1 || 1)) * 380 + 10
+        const y = 150 - (task.count / maxCount) * 130
+        return `${x},${y}`
+      }).join(' ')
     },
 
     showDeleteConfirm(friend) {
@@ -427,8 +950,12 @@ export default {
 
       this.deleting = true
       try {
+        const friendName = this.selectedFriend.friend_name || 
+                          this.selectedFriend.friend_username || 
+                          this.selectedFriend.username
+        
         const response = await deleteFriend({
-          friend_name: this.selectedFriend.friend_name || this.selectedFriend.friend_username
+          friend_name: friendName
         })
 
         if (response.success === true || response.success === "true") {
@@ -447,7 +974,22 @@ export default {
     },
 
     isFriend(userId) {
-      return this.friendsList.some(f => f.friend_id === userId)
+      if (!userId || !this.friendsList || this.friendsList.length === 0) {
+        return false
+      }
+      // 检查好友列表中是否包含该用户ID
+      // 好友对象可能包含 friend_id（好友的用户ID）字段
+      return this.friendsList.some(friend => {
+        // 检查 friend_id 是否匹配
+        if (friend.friend_id === userId) {
+          return true
+        }
+        // 如果好友对象已经包含完整的用户信息，也可能有 user_id 字段
+        if (friend.user_id === userId) {
+          return true
+        }
+        return false
+      })
     },
 
     hasPendingRequest(userId) {
@@ -486,6 +1028,10 @@ export default {
     goToHome() {
       this.$router.push('/')
     }
+  },
+  beforeUnmount() {
+    // 清理所有倒计时定时器
+    Object.values(this.countdownTimers).forEach(timer => clearInterval(timer))
   }
 }
 </script>
@@ -539,9 +1085,8 @@ export default {
 
 /* 主要内容区域 */
 .main-content {
-  max-width: 1200px;
-  margin: 0 auto;
-  padding: 40px 5%;
+  width: 100%;
+  padding: 20px;
 }
 
 .page-header {
@@ -568,21 +1113,882 @@ export default {
 /* 好友布局 */
 .friends-layout {
   display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 30px;
+  grid-template-columns: 320px 1fr;
+  gap: 20px;
   align-items: start;
 }
 
-/* 左侧区域 */
-.left-section {
+/* 左侧边栏 */
+.left-sidebar {
+  background: white;
+  border-radius: 16px;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.08);
+  border: 1px solid #e9ecef;
   display: flex;
   flex-direction: column;
-  gap: 30px;
+  height: calc(100vh - 100px);
+  position: sticky;
+  top: 100px;
 }
 
-/* 搜索区域 */
-.search-section,
-.requests-section {
+.sidebar-nav {
+  padding: 20px;
+  border-bottom: 2px solid #ffe4cc;
+}
+
+.nav-title {
+  font-size: 1.5em;
+  color: #333;
+  font-weight: 600;
+  margin: 0 0 20px 0;
+  text-align: center;
+}
+
+.nav-menu {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.nav-item {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 16px;
+  border: none;
+  background: #f8f9fa;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  font-size: 1em;
+  color: #333;
+  text-align: left;
+  position: relative;
+}
+
+.nav-item:hover {
+  background: #fff5eb;
+  color: #eeaa67;
+}
+
+.nav-item.active {
+  background: linear-gradient(135deg, #eeaa67, #ff8c42);
+  color: white;
+  font-weight: 600;
+}
+
+.nav-icon {
+  font-size: 1.2em;
+}
+
+.nav-badge {
+  margin-left: auto;
+  background: rgba(255, 255, 255, 0.3);
+  color: white;
+  padding: 2px 8px;
+  border-radius: 12px;
+  font-size: 0.85em;
+  font-weight: 600;
+}
+
+.nav-item.active .nav-badge {
+  background: rgba(255, 255, 255, 0.3);
+}
+
+/* 好友列表容器 */
+.friends-list-container {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.friends-list-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 15px 20px;
+  border-bottom: 1px solid #e9ecef;
+}
+
+.friends-list-header h3 {
+  margin: 0;
+  font-size: 1.1em;
+  color: #333;
+  font-weight: 600;
+}
+
+.refresh-btn {
+  padding: 6px 10px;
+  background: #f8f9fa;
+  border: 1px solid #e0e0e0;
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 1em;
+  transition: all 0.2s ease;
+}
+
+.refresh-btn:hover:not(:disabled) {
+  background: #fff5eb;
+  border-color: #eeaa67;
+  color: #eeaa67;
+  transform: rotate(90deg);
+}
+
+.refresh-btn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.friends-list-scroll {
+  flex: 1;
+  overflow-y: auto;
+  padding: 10px;
+}
+
+.friends-list-scroll::-webkit-scrollbar {
+  width: 6px;
+}
+
+.friends-list-scroll::-webkit-scrollbar-track {
+  background: #f1f1f1;
+  border-radius: 3px;
+}
+
+.friends-list-scroll::-webkit-scrollbar-thumb {
+  background: #eeaa67;
+  border-radius: 3px;
+}
+
+.friends-list-scroll::-webkit-scrollbar-thumb:hover {
+  background: #e69c55;
+}
+
+/* 展开的好友卡片 */
+.friend-card-expanded {
+  background: #f8f9fa;
+  border-radius: 12px;
+  padding: 15px;
+  margin-bottom: 12px;
+  border: 2px solid transparent;
+  cursor: pointer;
+  transition: all 0.3s ease;
+}
+
+.friend-card-expanded:hover {
+  background: #fff5eb;
+  border-color: #ffe4cc;
+  transform: translateX(3px);
+}
+
+.friend-card-expanded.selected {
+  background: linear-gradient(135deg, #fff5eb 0%, #ffe4cc 100%);
+  border-color: #eeaa67;
+  box-shadow: 0 4px 12px rgba(238, 170, 103, 0.2);
+}
+
+.friend-card-expanded .friend-avatar-wrapper {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 12px;
+}
+
+.friend-card-expanded .friend-avatar {
+  width: 50px;
+  height: 50px;
+  border-radius: 50%;
+  overflow: hidden;
+  border: 2px solid #eeaa67;
+  flex-shrink: 0;
+}
+
+.friend-card-expanded .friend-avatar img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.friend-card-expanded .friend-details {
+  flex: 1;
+  min-width: 0;
+}
+
+.friend-card-expanded .friend-name {
+  margin: 0 0 8px 0;
+  font-size: 1.05em;
+  font-weight: 600;
+  color: #333;
+}
+
+.friend-status-info {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-bottom: 8px;
+}
+
+.friend-card-expanded .current-task-info,
+.friend-card-expanded .countdown-info {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 0.85em;
+  color: #666;
+  margin-top: 6px;
+}
+
+.friend-card-expanded .task-text {
+  color: #333;
+  font-weight: 500;
+}
+
+.friend-card-expanded .countdown-text {
+  color: #eeaa67;
+  font-weight: 600;
+  font-family: 'Courier New', monospace;
+}
+
+.friend-card-expanded .friend-actions {
+  display: flex;
+  gap: 8px;
+  margin-top: 10px;
+  justify-content: flex-end;
+}
+
+.btn-view-info {
+  padding: 6px 12px;
+  background: #e3f2fd;
+  color: #1976d2;
+  border: 1px solid #90caf9;
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 1em;
+  transition: all 0.2s ease;
+}
+
+.btn-view-info:hover {
+  background: #bbdefb;
+  transform: scale(1.05);
+}
+
+/* 右侧内容区域 */
+.right-content {
+  background: white;
+  border-radius: 16px;
+  padding: 30px;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.08);
+  border: 1px solid #e9ecef;
+  min-height: calc(100vh - 100px);
+}
+
+.content-section {
+  width: 100%;
+}
+
+.welcome-message {
+  text-align: center;
+  padding: 60px 20px;
+  color: #666;
+}
+
+.welcome-icon {
+  font-size: 4em;
+  margin-bottom: 20px;
+}
+
+.welcome-message h2 {
+  margin: 0 0 15px 0;
+  color: #333;
+  font-size: 1.8em;
+}
+
+.welcome-message p {
+  margin: 0;
+  font-size: 1.1em;
+  line-height: 1.6;
+}
+
+.friend-detail-card {
+  background: #f8f9fa;
+  border-radius: 12px;
+  padding: 25px;
+  border: 1px solid #e9ecef;
+}
+
+.detail-header {
+  display: flex;
+  align-items: center;
+  gap: 20px;
+  margin-bottom: 25px;
+  padding-bottom: 20px;
+  border-bottom: 2px solid #ffe4cc;
+}
+
+.detail-avatar {
+  position: relative;
+  width: 80px;
+  height: 80px;
+  border-radius: 50%;
+  overflow: hidden;
+  border: 4px solid #eeaa67;
+  flex-shrink: 0;
+}
+
+.detail-avatar img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.detail-info {
+  flex: 1;
+}
+
+.detail-info h3 {
+  margin: 0 0 10px 0;
+  font-size: 1.5em;
+  color: #333;
+  font-weight: 600;
+}
+
+.detail-status {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.btn-view-stats {
+  padding: 10px 20px;
+  background: linear-gradient(135deg, #eeaa67, #ff8c42);
+  color: white;
+  border: none;
+  border-radius: 8px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.3s ease;
+}
+
+.btn-view-stats:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 15px rgba(238, 170, 103, 0.3);
+}
+
+.detail-content {
+  display: flex;
+  flex-direction: column;
+  gap: 15px;
+}
+
+.detail-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 12px;
+  background: white;
+  border-radius: 8px;
+  border: 1px solid #e9ecef;
+}
+
+.detail-label {
+  font-weight: 600;
+  color: #666;
+  min-width: 100px;
+}
+
+.detail-value {
+  color: #333;
+  flex: 1;
+}
+
+.countdown-value {
+  color: #eeaa67;
+  font-weight: 600;
+  font-family: 'Courier New', monospace;
+  font-size: 1.1em;
+}
+
+/* 好友主页头部 */
+.friend-profile-header {
+  display: flex;
+  align-items: center;
+  gap: 25px;
+  padding: 30px;
+  background: linear-gradient(135deg, #fff5eb 0%, #ffe4cc 100%);
+  border-radius: 16px;
+  margin-bottom: 25px;
+  border: 1px solid #ffe4cc;
+}
+
+.profile-avatar {
+  position: relative;
+  width: 100px;
+  height: 100px;
+  border-radius: 50%;
+  overflow: hidden;
+  border: 4px solid #eeaa67;
+  flex-shrink: 0;
+  box-shadow: 0 4px 15px rgba(238, 170, 103, 0.3);
+}
+
+.profile-avatar img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.online-indicator-large {
+  position: absolute;
+  bottom: 5px;
+  right: 5px;
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  border: 4px solid white;
+}
+
+.online-indicator-large.online {
+  background: #4CAF50;
+  box-shadow: 0 0 0 2px #4CAF50;
+}
+
+.online-indicator-large.offline {
+  background: #95a5a6;
+  box-shadow: 0 0 0 2px #95a5a6;
+}
+
+.profile-info {
+  flex: 1;
+}
+
+.profile-name {
+  margin: 0 0 15px 0;
+  font-size: 2em;
+  color: #333;
+  font-weight: 700;
+}
+
+.profile-status-row {
+  display: flex;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.status-badge-large {
+  padding: 8px 20px;
+  border-radius: 20px;
+  font-size: 1em;
+  font-weight: 600;
+}
+
+.status-badge-large.status-online {
+  background: #e7f5e9;
+  color: #2b8a3e;
+}
+
+.status-badge-large.status-busy {
+  background: #fff9f2;
+  color: #eeaa67;
+}
+
+.status-badge-large.status-offline {
+  background: #f0f0f0;
+  color: #666;
+}
+
+.tomato-status-large {
+  padding: 8px 20px;
+  border-radius: 20px;
+  font-size: 1em;
+  font-weight: 600;
+}
+
+.tomato-status-large.studying {
+  background: #ffebee;
+  color: #c92a2a;
+}
+
+.tomato-status-large.resting {
+  background: #e3f2fd;
+  color: #1976d2;
+}
+
+.tomato-status-large.idle {
+  background: #f5f5f5;
+  color: #666;
+}
+
+/* 导航栏 */
+.profile-nav {
+  display: flex;
+  gap: 10px;
+  margin-bottom: 25px;
+  border-bottom: 2px solid #ffe4cc;
+  padding-bottom: 0;
+}
+
+.nav-tab {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 12px 24px;
+  border: none;
+  background: transparent;
+  border-bottom: 3px solid transparent;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  font-size: 1em;
+  color: #666;
+  font-weight: 500;
+  margin-bottom: -2px;
+}
+
+.nav-tab:hover {
+  color: #eeaa67;
+  background: #fff5eb;
+}
+
+.nav-tab.active {
+  color: #eeaa67;
+  border-bottom-color: #eeaa67;
+  font-weight: 600;
+}
+
+.tab-icon {
+  font-size: 1.2em;
+}
+
+/* 个人信息内容 */
+.profile-content {
+  animation: fadeIn 0.3s ease;
+}
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.info-section {
+  background: #f8f9fa;
+  border-radius: 12px;
+  padding: 25px;
+  margin-bottom: 20px;
+  border: 1px solid #e9ecef;
+}
+
+.info-section-title {
+  margin: 0 0 20px 0;
+  font-size: 1.3em;
+  color: #333;
+  font-weight: 600;
+  padding-bottom: 15px;
+  border-bottom: 2px solid #ffe4cc;
+}
+
+.info-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+  gap: 15px;
+}
+
+.info-item {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 15px;
+  background: white;
+  border-radius: 8px;
+  border: 1px solid #e9ecef;
+}
+
+.info-label {
+  font-size: 0.9em;
+  color: #666;
+  font-weight: 500;
+}
+
+.info-value {
+  font-size: 1.1em;
+  color: #333;
+  font-weight: 600;
+}
+
+.status-value.status-online {
+  color: #2b8a3e;
+}
+
+.status-value.status-busy {
+  color: #eeaa67;
+}
+
+.status-value.status-offline {
+  color: #666;
+}
+
+.tomato-value.studying {
+  color: #c92a2a;
+}
+
+.tomato-value.resting {
+  color: #1976d2;
+}
+
+.tomato-value.idle {
+  color: #666;
+}
+
+.activity-card {
+  background: white;
+  border-radius: 12px;
+  padding: 20px;
+  border: 1px solid #e9ecef;
+}
+
+.activity-item {
+  display: flex;
+  align-items: center;
+  gap: 15px;
+  padding: 15px;
+  background: #f8f9fa;
+  border-radius: 8px;
+  margin-bottom: 12px;
+}
+
+.activity-item:last-child {
+  margin-bottom: 0;
+}
+
+.activity-icon {
+  font-size: 2em;
+  flex-shrink: 0;
+}
+
+.activity-content {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
+
+.activity-label {
+  font-size: 0.85em;
+  color: #666;
+  font-weight: 500;
+}
+
+.activity-value {
+  font-size: 1.1em;
+  color: #333;
+  font-weight: 600;
+}
+
+.countdown-display {
+  color: #eeaa67;
+  font-family: 'Courier New', monospace;
+  font-size: 1.3em;
+}
+
+/* 好友列表区域 */
+.friends-list-section {
+  background: white;
+  border-radius: 16px;
+  padding: 30px;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.08);
+  border: 1px solid #e9ecef;
+  margin-top: 30px;
+}
+
+.friends-list {
+  display: flex;
+  flex-direction: column;
+  gap: 15px;
+  margin-top: 20px;
+}
+
+.friend-card {
+  background: #f8f9fa;
+  border-radius: 12px;
+  padding: 20px;
+  border: 1px solid #e9ecef;
+  transition: all 0.3s ease;
+  cursor: pointer;
+}
+
+.friend-card:hover {
+  border-color: #eeaa67;
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(238, 170, 103, 0.2);
+  background: #fff5eb;
+}
+
+.friend-header {
+  display: flex;
+  align-items: center;
+  gap: 15px;
+}
+
+.friend-avatar-wrapper {
+  position: relative;
+  flex-shrink: 0;
+}
+
+.friend-avatar {
+  width: 60px;
+  height: 60px;
+  border-radius: 50%;
+  overflow: hidden;
+  border: 3px solid #eeaa67;
+}
+
+.friend-avatar img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.online-indicator {
+  position: absolute;
+  bottom: 2px;
+  right: 2px;
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  border: 3px solid white;
+}
+
+.online-indicator.online {
+  background: #4CAF50;
+}
+
+.online-indicator.offline {
+  background: #95a5a6;
+}
+
+.friend-main-info {
+  flex: 1;
+  min-width: 0;
+}
+
+.friend-name {
+  margin: 0 0 8px 0;
+  font-size: 1.1em;
+  font-weight: 600;
+  color: #333;
+}
+
+.friend-status-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.status-badge {
+  padding: 4px 12px;
+  border-radius: 12px;
+  font-size: 0.85em;
+  font-weight: 500;
+}
+
+.status-badge.status-online {
+  background: #e7f5e9;
+  color: #2b8a3e;
+}
+
+.status-badge.status-busy {
+  background: #fff9f2;
+  color: #eeaa67;
+}
+
+.status-badge.status-offline {
+  background: #f0f0f0;
+  color: #666;
+}
+
+.tomato-status {
+  padding: 4px 12px;
+  border-radius: 12px;
+  font-size: 0.85em;
+  font-weight: 500;
+}
+
+.tomato-status.studying {
+  background: #ffebee;
+  color: #c92a2a;
+}
+
+.tomato-status.resting {
+  background: #e3f2fd;
+  color: #1976d2;
+}
+
+.tomato-status.idle {
+  background: #f5f5f5;
+  color: #666;
+}
+
+.btn-delete-friend {
+  padding: 8px 12px;
+  background: #fff5f5;
+  color: #c92a2a;
+  border: 1px solid #ffcccc;
+  border-radius: 8px;
+  font-size: 1.2em;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  flex-shrink: 0;
+}
+
+.btn-delete-friend:hover {
+  background: #ffebee;
+  border-color: #ff9999;
+  transform: scale(1.1);
+}
+
+.friend-activity {
+  margin-top: 15px;
+  padding-top: 15px;
+  border-top: 1px solid #e9ecef;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.current-task, .countdown {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 0.9em;
+  color: #666;
+}
+
+.task-icon, .countdown-icon {
+  font-size: 1.2em;
+}
+
+.task-text {
+  color: #333;
+  font-weight: 500;
+}
+
+.countdown-text {
+  color: #eeaa67;
+  font-weight: 600;
+  font-family: 'Courier New', monospace;
+}
+
+/* 内容区域样式 */
+.content-section {
+  width: 100%;
+}
+
+.search-section {
   background: white;
   border-radius: 16px;
   padding: 30px;
@@ -864,116 +2270,6 @@ export default {
   cursor: not-allowed;
 }
 
-/* 右侧好友列表 */
-.right-section {
-  background: white;
-  border-radius: 16px;
-  padding: 30px;
-  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.08);
-  border: 1px solid #e9ecef;
-}
-
-.section-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  margin-bottom: 20px;
-}
-
-.refresh-btn {
-  padding: 8px 12px;
-  background: #f8f9fa;
-  border: 1px solid #e0e0e0;
-  border-radius: 6px;
-  cursor: pointer;
-  font-size: 1em;
-  transition: all 0.2s ease;
-}
-
-.refresh-btn:hover:not(:disabled) {
-  background: #fff5eb;
-  border-color: #eeaa67;
-  color: #eeaa67;
-}
-
-.refresh-btn:disabled {
-  opacity: 0.6;
-  cursor: not-allowed;
-}
-
-.friends-list {
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
-}
-
-.friend-item {
-  display: flex;
-  align-items: center;
-  gap: 15px;
-  padding: 16px;
-  background: #f8f9fa;
-  border-radius: 12px;
-  border: 1px solid #e9ecef;
-  transition: all 0.2s ease;
-}
-
-.friend-item:hover {
-  border-color: #eeaa67;
-  transform: translateY(-2px);
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
-}
-
-.friend-avatar {
-  width: 50px;
-  height: 50px;
-  border-radius: 50%;
-  overflow: hidden;
-  flex-shrink: 0;
-  background: #ddd;
-}
-
-.friend-avatar img {
-  width: 100%;
-  height: 100%;
-  object-fit: cover;
-}
-
-.friend-info {
-  flex: 1;
-  min-width: 0;
-}
-
-.friend-name {
-  margin: 0 0 4px 0;
-  font-size: 1em;
-  font-weight: 600;
-  color: #333;
-}
-
-.friend-status {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  font-size: 0.85em;
-  color: #666;
-}
-
-.btn-delete {
-  padding: 8px 16px;
-  background: #fff5f5;
-  color: #c92a2a;
-  border: 1px solid #ffcccc;
-  border-radius: 6px;
-  font-weight: 500;
-  cursor: pointer;
-  transition: all 0.2s ease;
-}
-
-.btn-delete:hover {
-  background: #ffebee;
-  border-color: #ff9999;
-}
 
 /* 空状态和加载状态 */
 .empty-state,
@@ -1141,10 +2437,360 @@ export default {
   background: #b52217;
 }
 
+/* 删除确认对话框样式 */
+.delete-confirm-modal {
+  text-align: center;
+  max-width: 450px;
+}
+
+.delete-confirm-modal .modal-icon {
+  font-size: 4em;
+  margin-bottom: 20px;
+  animation: shake 0.5s ease;
+}
+
+@keyframes shake {
+  0%, 100% { transform: translateX(0); }
+  25% { transform: translateX(-10px); }
+  75% { transform: translateX(10px); }
+}
+
+.delete-confirm-modal .modal-title {
+  color: #c92a2a;
+  margin-bottom: 15px;
+}
+
+.delete-confirm-modal .modal-message {
+  font-size: 1.1em;
+  color: #333;
+  margin-bottom: 10px;
+  line-height: 1.6;
+}
+
+.delete-confirm-modal .modal-message strong {
+  color: #eeaa67;
+  font-weight: 600;
+}
+
+.delete-confirm-modal .modal-hint {
+  font-size: 0.9em;
+  color: #999;
+  margin: 15px 0 25px 0;
+  font-style: italic;
+}
+
+/* 好友学习概览模态框 */
+.friend-overview-modal {
+  max-width: 800px;
+  max-height: 90vh;
+  overflow-y: auto;
+}
+
+.overview-header {
+  display: flex;
+  align-items: center;
+  gap: 20px;
+  padding-bottom: 20px;
+  border-bottom: 2px solid #ffe4cc;
+  margin-bottom: 25px;
+  position: relative;
+}
+
+.overview-avatar {
+  width: 80px;
+  height: 80px;
+  border-radius: 50%;
+  overflow: hidden;
+  border: 4px solid #eeaa67;
+  flex-shrink: 0;
+}
+
+.overview-avatar img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.overview-info {
+  flex: 1;
+}
+
+.overview-name {
+  margin: 0 0 8px 0;
+  font-size: 1.5em;
+  color: #333;
+  font-weight: 600;
+}
+
+.overview-status {
+  padding: 6px 16px;
+  border-radius: 16px;
+  font-size: 0.9em;
+  font-weight: 500;
+  display: inline-block;
+}
+
+.overview-status.status-online {
+  background: #e7f5e9;
+  color: #2b8a3e;
+}
+
+.overview-status.status-busy {
+  background: #fff9f2;
+  color: #eeaa67;
+}
+
+.overview-status.status-offline {
+  background: #f0f0f0;
+  color: #666;
+}
+
+.close-btn {
+  position: absolute;
+  top: 0;
+  right: 0;
+  width: 40px;
+  height: 40px;
+  border: none;
+  background: #f8f9fa;
+  border-radius: 50%;
+  font-size: 1.5em;
+  cursor: pointer;
+  color: #666;
+  transition: all 0.2s ease;
+}
+
+.close-btn:hover {
+  background: #eeaa67;
+  color: white;
+  transform: rotate(90deg);
+}
+
+.overview-content {
+  display: flex;
+  flex-direction: column;
+  gap: 25px;
+}
+
+.stat-card-overview {
+  background: linear-gradient(135deg, #fff5eb 0%, #ffe4cc 100%);
+  border-radius: 16px;
+  padding: 25px;
+  border: 1px solid #ffe4cc;
+}
+
+.stat-item {
+  display: flex;
+  align-items: center;
+  gap: 20px;
+}
+
+.stat-item .stat-icon {
+  font-size: 3em;
+}
+
+.stat-details {
+  flex: 1;
+}
+
+.stat-item .stat-value {
+  font-size: 2.5em;
+  font-weight: 700;
+  color: #eeaa67;
+  margin-bottom: 5px;
+}
+
+.stat-item .stat-label {
+  font-size: 1em;
+  color: #666;
+  font-weight: 500;
+}
+
+.chart-section {
+  background: white;
+  border-radius: 12px;
+  padding: 20px;
+  border: 1px solid #e9ecef;
+}
+
+.chart-title {
+  margin: 0 0 20px 0;
+  font-size: 1.2em;
+  color: #333;
+  font-weight: 600;
+}
+
+.bar-chart {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-around;
+  gap: 10px;
+  height: 200px;
+  padding: 10px 0;
+}
+
+.bar-item {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+}
+
+.bar {
+  width: 100%;
+  background: linear-gradient(180deg, #eeaa67 0%, #ff8c42 100%);
+  border-radius: 4px 4px 0 0;
+  min-height: 10px;
+  transition: all 0.3s ease;
+}
+
+.bar-item:hover .bar {
+  opacity: 0.8;
+  transform: scaleY(1.05);
+}
+
+.bar-label {
+  font-size: 0.85em;
+  color: #666;
+  font-weight: 500;
+}
+
+.bar-value {
+  font-size: 0.9em;
+  color: #eeaa67;
+  font-weight: 600;
+}
+
+.line-chart {
+  position: relative;
+  height: 200px;
+  padding: 20px 0;
+}
+
+.chart-svg {
+  width: 100%;
+  height: 100%;
+}
+
+.chart-labels {
+  display: flex;
+  justify-content: space-around;
+  margin-top: 10px;
+  font-size: 0.85em;
+  color: #666;
+}
+
+.subjects-section {
+  background: white;
+  border-radius: 12px;
+  padding: 20px;
+  border: 1px solid #e9ecef;
+}
+
+.subject-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.subject-tag {
+  padding: 8px 16px;
+  background: linear-gradient(135deg, #fff5eb 0%, #ffe4cc 100%);
+  border-radius: 20px;
+  border: 1px solid #eeaa67;
+  font-size: 0.9em;
+  color: #333;
+  font-weight: 500;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.subject-count {
+  background: #eeaa67;
+  color: white;
+  padding: 2px 8px;
+  border-radius: 10px;
+  font-size: 0.85em;
+  font-weight: 600;
+}
+
+/* 用户不存在对话框样式 */
+.user-not-found-modal {
+  text-align: center;
+  max-width: 450px;
+}
+
+.modal-icon {
+  font-size: 4em;
+  margin-bottom: 20px;
+  animation: bounce 0.6s ease;
+}
+
+@keyframes bounce {
+  0%, 100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(-10px);
+  }
+}
+
+.user-not-found-modal .modal-title {
+  color: #eeaa67;
+  margin-bottom: 15px;
+}
+
+.user-not-found-modal .modal-message {
+  font-size: 1.1em;
+  color: #333;
+  margin-bottom: 10px;
+  line-height: 1.6;
+}
+
+.user-not-found-modal .modal-message strong {
+  color: #eeaa67;
+  font-weight: 600;
+}
+
+.modal-hint {
+  font-size: 0.9em;
+  color: #666;
+  margin: 15px 0 25px 0;
+  line-height: 1.5;
+}
+
+.user-not-found-modal .form-actions {
+  justify-content: center;
+}
+
+.user-not-found-modal .confirm-btn {
+  min-width: 120px;
+  padding: 12px 30px;
+  background: linear-gradient(135deg, #eeaa67, #f5b877);
+  box-shadow: 0 4px 15px rgba(238, 170, 103, 0.3);
+}
+
+.user-not-found-modal .confirm-btn:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 6px 20px rgba(238, 170, 103, 0.4);
+}
+
 /* 响应式设计 */
 @media (max-width: 968px) {
   .friends-layout {
     grid-template-columns: 1fr;
+  }
+  
+  .left-sidebar {
+    position: static;
+    height: auto;
+    max-height: 60vh;
+  }
+  
+  .right-content {
+    min-height: auto;
   }
 }
 

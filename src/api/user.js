@@ -56,3 +56,18 @@ export const updateCurrentUserPrivacy = async (data) => {
   return request.put(`${API_BASE_URL}/me/privacy`, data)
 }
 
+// 获取当前用户资产信息（包括签到天数）
+export const getCurrency = async () => {
+  return request.get(`${API_BASE_URL}/me/currency`)
+}
+
+// 每日签到
+export const checkIn = async () => {
+  return request.post(`${API_BASE_URL}/me/checkin`)
+}
+
+// 获取本月所有签到日期
+export const getCurrentMonthCheckInDates = async () => {
+  return request.get(`${API_BASE_URL}/me/checkin/dates`)
+}
+

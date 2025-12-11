@@ -93,12 +93,12 @@
           <span class="birthday-separator">年</span>
           <select v-model="birthdayMonth" class="form-input birthday-select" @change="updateBirthday">
             <option value="">月</option>
-            <option v-for="month in months" :key="month" :value="month">{{ month }}</option>
+            <option v-for="month in months" :key="month" :value="String(month)">{{ month }}</option>
           </select>
           <span class="birthday-separator">月</span>
           <select v-model="birthdayDay" class="form-input birthday-select" @change="updateBirthday">
             <option value="">日</option>
-            <option v-for="day in availableDays" :key="day" :value="day">{{ day }}</option>
+            <option v-for="day in availableDays" :key="day" :value="String(day)">{{ day }}</option>
           </select>
           <span class="birthday-separator">日</span>
         </div>
@@ -456,12 +456,25 @@ export default {
     
     // 更新生日（当年月日改变时调用）
     updateBirthday() {
-      if (this.birthdayYear && this.birthdayMonth && this.birthdayDay) {
+      // 确保所有值都存在且有效
+      const year = this.birthdayYear
+      const month = this.birthdayMonth
+      const day = this.birthdayDay
+      
+      if (year && month && day) {
         // 格式化为 YYYY-MM-DD
-        const year = this.birthdayYear
-        const month = this.birthdayMonth.padStart(2, '0')
-        const day = this.birthdayDay.padStart(2, '0')
-        this.editForm.birthday = `${year}-${month}-${day}`
+        // 确保所有值都是字符串类型，然后使用 padStart
+        const yearStr = String(year).trim()
+        const monthStr = String(month).trim()
+        const dayStr = String(day).trim()
+        
+        if (yearStr && monthStr && dayStr) {
+          const monthPadded = monthStr.padStart(2, '0')
+          const dayPadded = dayStr.padStart(2, '0')
+          this.editForm.birthday = `${yearStr}-${monthPadded}-${dayPadded}`
+        } else {
+          this.editForm.birthday = ''
+        }
       } else {
         this.editForm.birthday = ''
       }

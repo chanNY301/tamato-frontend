@@ -28,7 +28,13 @@
             :class="['friend-item', { 'is-expanded': expandedUserId === friend.user_id }]"
             @click="toggleDetails(friend.user_id)"
           >
-            <div class="friend-avatar"></div>
+            <div class="friend-avatar">
+              <img 
+                :src="getAvatarUrl(friend.avatar)" 
+                alt="好友头像"
+                @error="handleAvatarError"
+              />
+            </div>
             
             <div class="friend-name-wrapper">
               <div class="friend-name">{{ friend.username }}</div>
@@ -70,8 +76,9 @@
 </template>
 
 <script>
-// API 基础 URL
-const BASE_URL = 'http://127.0.0.1:4523/m1/7239915-6966518-default';
+import { getFriends } from '@/api/friends'
+import { API_BASE_URL } from '@/api/config'
+import avatarImage from '@/assets/images/avatar.png'
 
 export default {
   name: 'FriendList',
@@ -80,7 +87,8 @@ export default {
       loading: false,
       error: '',
       friendsList: [], 
-      expandedUserId: null, 
+      expandedUserId: null,
+      defaultAvatar: avatarImage
     };
   },
   created() {
@@ -103,9 +111,10 @@ export default {
     formatUserDetails(data) {
       return {
         user_id: data.user_id,
-        username: data.username,
-        status: data.status,
-        statusClass: this.getStatusClass(data.status),
+        username: data.username || data.friend_name || data.friend_username,
+        status: data.status || data.friend_status || '未知',
+        statusClass: this.getStatusClass(data.status || data.friend_status),
+        avatar: data.avatar,
         email: data.email,
         phone: data.phone,
         sex: data.sex,
@@ -117,18 +126,22 @@ export default {
 
     async fetchUserDetails(username) {
       try {
-        const response = await fetch(`${BASE_URL}/api/users/${username}`);
+        const response = await fetch(`${API_BASE_URL}/users/${encodeURIComponent(username)}`, {
+          headers: {
+            'Authorization': `Bearer ${localStorage.getItem('token') || ''}`
+          }
+        });
         const result = await response.json();
 
         if (response.ok && result.success && result.data) {
           return this.formatUserDetails(result.data);
         } else {
           console.error(`获取用户 ${username} 详情失败:`, result.message);
-          return { user_id: username, username, status: '未知', statusClass: 'default' };
+          return { user_id: null, username, status: '未知', statusClass: 'default' };
         }
       } catch (err) {
         console.error(`请求用户 ${username} 详情失败:`, err);
-        return { user_id: username, username, status: '网络错误', statusClass: 'default' };
+        return { user_id: null, username, status: '网络错误', statusClass: 'default' };
       }
     },
 
@@ -138,23 +151,31 @@ export default {
       this.expandedUserId = null; 
 
       try {
-        const mockFriendshipList = [
-            { friend_username: "k1z92" },
-            { friend_username: "userB" },
-            { friend_username: "userC" },
-            { friend_username: "userD" },
-            { friend_username: "userE" },
-            { friend_username: "userF" },
-        ];
+        // 从API获取好友列表
+        const response = await getFriends();
         
-        const detailPromises = mockFriendshipList.map(item => 
-            this.fetchUserDetails(item.friend_username)
-        );
-        
-        const detailedFriends = await Promise.all(detailPromises);
-        
-        this.friendsList = detailedFriends.filter(f => f.user_id);
-        
+        if (response.success === true || response.success === "true" || response.code === 200) {
+          const friendsList = response.data || [];
+          
+          // 获取每个好友的详细信息
+          const detailPromises = friendsList.map(friend => {
+            const username = friend.friend_name || friend.friend_username;
+            if (username) {
+              return this.fetchUserDetails(username);
+            } else {
+              // 如果已经有足够的信息，直接格式化
+              return Promise.resolve(this.formatUserDetails(friend));
+            }
+          });
+          
+          const detailedFriends = await Promise.all(detailPromises);
+          
+          // 过滤掉没有user_id的好友（用户不存在）
+          this.friendsList = detailedFriends.filter(f => f.user_id);
+        } else {
+          this.error = response.message || '获取好友列表失败';
+          this.friendsList = [];
+        }
       } catch (err) {
         this.error = '好友列表加载失败，请检查服务连接。';
         console.error('Fetch Friends Error:', err);
@@ -166,6 +187,26 @@ export default {
 
     toggleDetails(userId) {
       this.expandedUserId = this.expandedUserId === userId ? null : userId;
+    },
+
+    getAvatarUrl(avatar) {
+      if (!avatar || avatar === this.defaultAvatar) {
+        return this.defaultAvatar;
+      }
+      // 如果已经是完整URL，直接返回
+      if (avatar.startsWith('http')) {
+        return avatar;
+      }
+      // 如果是相对路径，添加完整URL（头像通常存储在/uploads目录）
+      if (avatar.startsWith('/')) {
+        return `http://localhost:8090${avatar}`;
+      }
+      // 否则拼接完整URL
+      return `http://localhost:8090${avatar}`;
+    },
+
+    handleAvatarError(event) {
+      event.target.src = this.defaultAvatar;
     },
   },
 };
@@ -181,7 +222,8 @@ export default {
   display: flex;
   flex-direction: column;
   height: 100%; 
-  min-height: 300px; 
+  max-height: 100%;
+  min-height: 200px; 
 }
 
 .friends-header {
@@ -246,7 +288,18 @@ export default {
   border-radius: 50%;
   background-color: #ddd;
   flex-shrink: 0;
-  background-image: linear-gradient(45deg, #cc2a1f, #eeaa67); 
+  overflow: hidden;
+  background-image: linear-gradient(45deg, #cc2a1f, #eeaa67);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.friend-avatar img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  border-radius: 50%;
 }
 
 /* 名字包装容器：占据所有中间空间，将状态推到右边 */
