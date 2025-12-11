@@ -2,7 +2,7 @@
 import request from './request'
 import { getToken } from './config'
 
-const BASE_URL = 'http://127.0.0.1:4523/m1/7239915-6966518-default'
+const BASE_URL = 'http://localhost:8090/api'
 
 // 获取自习室列表
 export const getRoomsList = () => {
@@ -14,6 +14,7 @@ export const createRoom = (roomData) => {
   const token = getToken()
   const config = token ? {
     headers: {
+      'Content-Type': 'application/json',
       'Authorization': `Bearer ${token}`
     }
   } : {}
@@ -39,6 +40,7 @@ export const updateRoom = (roomId, roomData) => {
   const token = getToken()
   const config = token ? {
     headers: {
+      'Content-Type': 'application/json',
       'Authorization': `Bearer ${token}`
     }
   } : {}
@@ -111,6 +113,7 @@ export const updateUserStatus = (roomId, statusData) => {
   const token = getToken()
   const config = token ? {
     headers: {
+      'Content-Type': 'application/json',
       'Authorization': `Bearer ${token}`
     }
   } : {}

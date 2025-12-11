@@ -163,18 +163,15 @@ export default {
       this.loading = true
 
       try {
-        // 使用真实用户信息
+        // ✅ 修正：前端不生成roomId，让后端生成
         const requestData = {
-          room_id: Date.now().toString().slice(-6), // 基于时间生成唯一ID
-          room_name: this.roomForm.room_name.trim(),
-          description: this.roomForm.description.trim() || '一起来学习吧！',
-          create_person: this.currentUser.username,  // 使用真实用户名
-          user_id: this.currentUser.id || this.currentUser.user_id,  // 使用真实用户ID
-          max_members: parseInt(this.roomForm.max_members),
-          music_name: this.roomForm.music_name,
-          // 可以根据需要添加其他字段
-          created_at: new Date().toISOString(),
-          status: 'active'
+          roomName: this.roomForm.room_name.trim(),
+          createPerson: this.currentUser.id || this.currentUser.user_id, // 应该是数字ID
+          maxMembers: parseInt(this.roomForm.max_members),
+          // 添加其他可选字段
+          description: this.roomForm.description.trim() || '',
+          musicName: this.roomForm.music_name || '无'
+          // 不传 roomId，让后端生成
         }
 
         console.log('发送创建请求:', requestData)
@@ -183,19 +180,52 @@ export default {
         console.log('创建响应结果:', response)
         
         // 处理响应
-        if (response.success || response.code === 200) {
-          // 使用响应中的room_id或请求中的room_id
-          const roomId = response.data?.room_id || requestData.room_id
+        if (response.code === 200 || response.success) {
+          // ✅ 关键：从后端响应中获取roomId
+          // 尝试多种可能的字段名
+          const roomId = response.data?.roomId || 
+                        response.data?.room_id || 
+                        response.data?.roomID
           
-          alert(`自习室创建成功！\n房间名称: ${requestData.room_name}\n房间ID: ${roomId}`)
+          if (!roomId) {
+            console.error('后端未返回roomId，响应数据:', response.data)
+            alert('创建成功，但未获取到房间ID')
+            return
+          }
           
-          // 跳转到新创建的自习室
-          this.$router.push({
-            name: 'study-room', 
-            params: { roomId: roomId }
-          })
+          const roomName = response.data?.roomName || 
+                          response.data?.room_name || 
+                          requestData.roomName
+          
+          console.log('创建成功，房间信息:', { roomId, roomName })
+          
+          alert(`自习室创建成功！\n房间名称: ${roomName}\n房间ID: ${roomId}`)
+          
+          // ✅ 关键：使用后端返回的roomId进行跳转
+          // 确保roomId是字符串
+          const roomIdStr = String(roomId).trim()
+          
+          if (roomIdStr && roomIdStr !== 'undefined' && roomIdStr !== 'null') {
+            console.log('准备跳转到自习室，roomId:', roomIdStr)
+            
+            // 尝试不同的跳转方式
+            try {
+              // 方式1：使用路由名称和params
+              this.$router.push({
+                name: 'study-room',
+                params: { roomId: roomIdStr }
+              })
+            } catch (routeError) {
+              console.error('路由跳转失败（方式1）:', routeError)
+              
+              // 方式2：使用完整路径
+              this.$router.push(`/study-room/${roomIdStr}`)
+            }
+          } else {
+            console.error('roomId无效:', roomId)
+            alert('房间ID无效，无法跳转')
+          }
         } else {
-          // 处理创建失败
           const errorMessage = response.message || '创建失败，请稍后重试'
           alert(`创建失败: ${errorMessage}`)
         }
@@ -203,25 +233,34 @@ export default {
       } catch (error) {
         console.error('请求异常:', error)
         
-        // 更详细的错误提示
-        if (error.response) {
-          // 服务器返回了错误状态码
-          const status = error.response.status
-          if (status === 401) {
-            alert('登录已过期，请重新登录')
-            this.$router.push('/login')
-          } else if (status === 403) {
-            alert('权限不足，无法创建自习室')
-          } else {
-            alert(`服务器错误 (${status}): ${error.response.data?.message || '创建失败'}`)
+        // 详细的错误诊断
+        if (error.message) {
+          console.error('错误信息:', error.message)
+          
+          if (error.message.includes('Missing required param')) {
+            console.error('路由参数缺失，可能的原因：')
+            console.error('1. 路由配置不正确')
+            console.error('2. roomId参数传递有问题')
+            console.error('3. 路由名称不正确')
+            
+            // 检查路由配置
+            console.log('当前路由配置:', this.$router.options.routes)
+            
+            alert(`路由错误: ${error.message}\n请检查控制台查看详细信息`)
+          } else if (error.message.includes('Cannot find module')) {
+            alert('路由组件未找到，请检查路由配置')
           }
+        }
+        
+        // 显示用户友好的错误信息
+        if (error.response) {
+          alert(`服务器错误: ${error.response.status} - ${error.response.data?.message || '未知错误'}`)
         } else if (error.request) {
-          // 请求已发出但没有收到响应
           alert('网络错误，请检查网络连接')
         } else {
-          // 其他错误
           alert(`创建失败: ${error.message || '未知错误'}`)
         }
+        
       } finally {
         this.loading = false
       }

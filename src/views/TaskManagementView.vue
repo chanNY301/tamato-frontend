@@ -20,7 +20,7 @@
         <div class="task-list-section">
           <div class="section-header">
             <h2 class="section-title">我的任务</h2>
-            <button @click="showCreateModal = true" class="create-task-btn">
+            <button @click="openCreateModal" class="create-task-btn">
               <span class="btn-icon">+</span>
               新建任务
             </button>
@@ -43,34 +43,37 @@
           <div class="tasks-container">
             <div 
               v-for="task in filteredTasks" 
-              :key="task.task_id || task.taskId"
+              :key="getTaskId(task)"
               class="task-card"
               :class="getTaskStatusClass(task.status)"
             >
               <div class="task-main">
                 <div class="task-header">
                   <div class="task-title-section">
-                    <h3 class="task-title">{{ task.task_name || task.taskName }}</h3>
+                    <h3 class="task-title">{{ getTaskName(task) }}</h3>
                     <span class="task-duration">{{ task.duration || 25 }}分钟</span>
                   </div>
                   <div class="task-actions">
+                    <!-- 完成按钮 -->
                     <button 
-                      v-if="task.status !== '已完成'" 
-                      @click="toggleTaskStatus(task)"
-                      class="action-btn status-btn"
+                      v-if="!isTaskCompleted(task)"
+                      @click="completeTask(task)"
+                      class="action-btn complete-btn"
                     >
-                      {{ task.status === '进行中' ? '进行中' : '开始' }}
+                      完成
                     </button>
+                    <!-- 编辑按钮 -->
                     <button @click="editTask(task)" class="action-btn edit-btn">
                       编辑
                     </button>
-                    <button @click="deleteTask(task.task_id || task.taskId)" class="action-btn delete-btn">
+                    <!-- 删除按钮 -->
+                    <button @click="deleteTask(getTaskId(task))" class="action-btn delete-btn">
                       删除
                     </button>
                   </div>
                 </div>
                 
-                <p v-if="task.task_note || task.taskNote" class="task-note">{{ task.task_note || task.taskNote }}</p>
+                <p v-if="getTaskNote(task)" class="task-note">{{ getTaskNote(task) }}</p>
                 
                 <div class="task-footer">
                   <span class="create-time">
@@ -88,7 +91,7 @@
               <div class="empty-icon">📝</div>
               <h3>暂无任务</h3>
               <p>创建一个新任务开始你的学习计划吧</p>
-              <button @click="showCreateModal = true" class="create-first-btn">
+              <button @click="openCreateModal" class="create-first-btn">
                 创建第一个任务
               </button>
             </div>
@@ -105,12 +108,12 @@
                 <div class="stat-label">总任务</div>
               </div>
               <div class="stat-item">
-                <div class="stat-value">{{ todayCompleted }}</div>
+                <div class="stat-value">{{ completedTasks }}</div>
                 <div class="stat-label">已完成</div>
               </div>
               <div class="stat-item">
-                <div class="stat-value">{{ inProgressTasks }}</div>
-                <div class="stat-label">进行中</div>
+                <div class="stat-value">{{ pendingTasks }}</div>
+                <div class="stat-label">未完成</div>
               </div>
             </div>
           </div>
@@ -132,7 +135,7 @@
     </main>
 
     <!-- 创建/编辑任务弹窗 -->
-    <div v-if="showCreateModal || editingTask" class="modal-overlay">
+    <div v-if="showModal" class="modal-overlay">
       <div class="task-modal">
         <h3 class="modal-title">{{ editingTask ? '编辑任务' : '创建新任务' }}</h3>
         
@@ -192,9 +195,9 @@ export default {
     return {
       loading: false,
       tasks: [],
-      userId: null, // 当前用户ID
+      userId: null,
       activeTab: 'all',
-      showCreateModal: false,
+      showModal: false,
       editingTask: null,
       taskForm: {
         task_name: '',
@@ -214,16 +217,20 @@ export default {
       if (this.activeTab === 'all') {
         return this.tasks
       }
-      return this.tasks.filter(task => task.status === this.activeTab)
+      
+      return this.tasks.filter(task => {
+        const status = this.getStatusText(task.status)
+        return status === this.activeTab
+      })
     },
     totalTasks() {
       return this.tasks.length
     },
-    todayCompleted() {
-      return this.tasks.filter(task => task.status === '已完成').length
+    completedTasks() {
+      return this.tasks.filter(task => this.isTaskCompleted(task)).length
     },
     inProgressTasks() {
-      return this.tasks.filter(task => task.status === '进行中').length
+      return this.tasks.filter(task => this.getStatusText(task.status) === '进行中').length
     }
   },
   async mounted() {
@@ -231,14 +238,97 @@ export default {
     await this.loadTasks()
   },
   methods: {
+    // 工具方法
+    getTaskId(task) {
+      return task.task_id || task.taskId
+    },
+    
+    getTaskName(task) {
+      return task.task_name || task.taskName
+    },
+    
+    getTaskNote(task) {
+      return task.task_note || task.taskNote
+    },
+
+    // 状态判断
+    isTaskCompleted(task) {
+      const status = task.status || ''
+      const statusText = this.getStatusText(status)
+      return statusText === '已完成'
+    },
+
+    getTaskCount(status) {
+      if (status === 'all') return this.tasks.length
+      return this.tasks.filter(task => this.getStatusText(task.status) === status).length
+    },
+
+    getTaskStatusClass(status) {
+      const statusText = this.getStatusText(status)
+      if (statusText === '未完成') return 'task-not-started'
+      if (statusText === '进行中') return 'task-in-progress'
+      if (statusText === '已完成') return 'task-completed'
+      return 'task-not-started'
+    },
+
+    getStatusTagClass(status) {
+      const statusText = this.getStatusText(status)
+      if (statusText === '未完成') return 'tag-not-started'
+      if (statusText === '进行中') return 'tag-in-progress'
+      if (statusText === '已完成') return 'tag-completed'
+      return 'tag-not-started'
+    },
+
+    getStatusText(status) {
+      if (!status) return '未完成'
+      
+      const statusStr = String(status).trim().toLowerCase()
+      
+      if (
+        statusStr === '已完成' || 
+        statusStr === '完成' ||
+        statusStr === 'finished' || 
+        statusStr === 'done' ||
+        statusStr === '已完'
+      ) {
+        return '已完成'
+      }
+      
+      if (
+        statusStr === '进行中' ||
+        statusStr === '进行' ||
+        statusStr === 'in_progress' ||
+        statusStr === 'in progress' ||
+        statusStr === 'doing'
+      ) {
+        return '进行中'
+      }
+      
+      return '未完成'
+    },
+
+    formatTime(timeStr) {
+      if (!timeStr) return '-'
+      return new Date(timeStr).toLocaleDateString()
+    },
+
+    // API相关方法
     async initUser() {
       try {
         const userResult = await getCurrentUser()
-        if (userResult.success && userResult.data) {
-          this.userId = userResult.data.user_id
-        } else {
-          console.error('获取用户信息失败')
+        console.log('用户信息响应:', userResult)
+        
+        if (userResult && userResult.data) {
+          // 根据user.js的返回结构，user_id可能在不同的位置
+          if (userResult.data.user_id) {
+            this.userId = userResult.data.user_id
+          } else if (userResult.data.id) {
+            this.userId = userResult.data.id
+          } else {
+            console.warn('未找到user_id字段，用户数据:', userResult.data)
+          }
         }
+        console.log('获取到的userId:', this.userId)
       } catch (error) {
         console.error('初始化用户失败:', error)
       }
@@ -246,26 +336,26 @@ export default {
 
     async loadTasks() {
       if (!this.userId) {
-        console.error('用户ID未获取，无法加载任务')
+        console.warn('userId为空，无法加载任务')
         return
       }
 
       try {
         this.loading = true
+        console.log('正在加载任务，userId:', this.userId)
         const response = await getTasks(this.userId)
-        console.log('获取任务列表响应:', response)
+        console.log('任务加载响应:', response)
         
-        // 处理后端返回的数据格式
         if (response.success === true || response.success === "true" || response.code === 200) {
-          // 可能是 {success: true, data: []} 或 {code: 200, data: []} 格式
           this.tasks = response.data || []
         } else if (Array.isArray(response)) {
-          // 如果直接返回数组
           this.tasks = response
         } else {
-          console.error('获取任务失败:', response.message || '未知错误')
           this.tasks = []
         }
+        
+        console.log('加载的任务列表:', this.tasks)
+        
       } catch (error) {
         console.error('加载任务失败:', error)
         this.tasks = []
@@ -274,146 +364,149 @@ export default {
       }
     },
 
-    getTaskCount(status) {
-      if (status === 'all') return this.tasks.length
-      return this.tasks.filter(task => task.status === status).length
-    },
-
-    getTaskStatusClass(status) {
-      return {
-        'task-not-started': status === '未完成',
-        'task-in-progress': status === '进行中',
-        'task-completed': status === '已完成'
+    // 完成任务
+    async completeTask(task) {
+      if (this.isTaskCompleted(task)) {
+        return
+      }
+      
+      if (!confirm('确定要标记为完成吗？')) return
+      
+      try {
+        const taskId = this.getTaskId(task)
+        const updateData = {
+          task_name: this.getTaskName(task),
+          user_id: this.userId,
+          status: '已完成'
+        }
+        
+        console.log('完成任务请求:', { taskId, updateData })
+        
+        const response = await updateTask(taskId, updateData)
+        console.log('完成任务响应:', response)
+        
+        // 方法1：使用更安全的方式更新状态（不依赖 $set）
+        const taskIndex = this.tasks.findIndex(t => this.getTaskId(t) === taskId)
+        if (taskIndex !== -1) {
+          // 创建新对象，避免响应式问题
+          const updatedTask = {
+            ...this.tasks[taskIndex],
+            status: '已完成'
+          }
+          this.tasks.splice(taskIndex, 1, updatedTask)
+        }
+        
+        // 不显示弹窗，避免干扰用户体验
+        // alert('任务已完成！')
+        
+      } catch (error) {
+        console.error('完成任务失败:', error)
+        // 更友好的错误提示
+        if (error.response && error.response.status === 401) {
+          alert('请先登录')
+          this.$router.push('/login')
+        } else if (error.response && error.response.status === 404) {
+          alert('任务不存在或已被删除')
+          await this.loadTasks() // 重新加载任务列表
+        } else {
+          alert('标记完成失败，请稍后重试')
+        }
       }
     },
 
-    getStatusTagClass(status) {
-      return {
-        'tag-not-started': status === '未完成',
-        'tag-in-progress': status === '进行中',
-        'tag-completed': status === '已完成'
-      }
-    },
-
-    getStatusText(status) {
-      const statusMap = {
-        '未完成': '未开始',
-        '进行中': '进行中',
-        '已完成': '已完成'
-      }
-      return statusMap[status] || status
-    },
-
-    formatTime(timeStr) {
-      if (!timeStr) return '-'
-      return new Date(timeStr).toLocaleDateString()
-    },
-
+    // 创建/更新任务 - 根据接口文档修复
     async submitTask() {
       try {
         if (this.editingTask) {
-          // 更新任务
-          const taskId = this.editingTask.task_id || this.editingTask.taskId
+          // 编辑现有任务
+          const taskId = this.getTaskId(this.editingTask)
           const updateData = {
             task_name: this.taskForm.task_name,
             task_note: this.taskForm.task_note || null,
-            task_id: taskId
+            // 编辑时不需要传duration，因为接口文档没有
+            user_id: this.userId  // 根据接口文档添加user_id
           }
-          const response = await updateTask(taskId, updateData)
-          console.log('更新任务响应:', response)
           
-          // 检查响应
+          console.log('编辑任务数据:', updateData)
+          
+          const response = await updateTask(taskId, updateData)
+          console.log('编辑任务响应:', response)
+          
           if (response.success === false || response.success === "false") {
             alert(response.message || '更新任务失败')
             return
           }
         } else {
-          // 创建任务
+          // 创建新任务 - 根据接口文档
           const createData = {
-            task_name: this.taskForm.task_name,
-            task_note: this.taskForm.task_note || null,
-            duration: parseInt(this.taskForm.duration) || 25
+            user_id: this.userId,  // 必需字段
+            task_name: this.taskForm.task_name,  // 必需字段
+            task_note: this.taskForm.task_note || null,  // 可选
+            duration: parseInt(this.taskForm.duration) || 25  // 可选
+            // 注意：不传status字段，让后端设置默认值
           }
+          
+          console.log('创建任务数据:', createData)
+          
           const response = await createTask(createData)
           console.log('创建任务响应:', response)
           
-          // 检查响应（后端返回 success 可能是字符串 "true"/"false"）
           if (response.success === false || response.success === "false") {
             alert(response.message || '创建任务失败')
             return
           }
         }
         
-        // 关闭弹窗
         this.closeModal()
-        // 重新加载任务列表
+        // 重新加载确保数据同步
         await this.loadTasks()
+        
       } catch (error) {
         console.error('操作任务失败:', error)
         alert('操作失败，请重试: ' + (error.message || '未知错误'))
       }
     },
 
-    editTask(task) {
-      this.editingTask = task
-      this.taskForm = {
-        task_name: task.task_name || task.taskName || '',
-        task_note: task.task_note || task.taskNote || '',
-        duration: task.duration || 25
-      }
-    },
-
+    // 删除任务 - 根据接口文档修复
     async deleteTask(taskId) {
       if (!confirm('确定要删除这个任务吗？')) return
       
       try {
-        const response = await deleteTask(taskId)
-        console.log('删除任务响应:', response)
+        console.log('正在删除任务，taskId:', taskId)
+        // 注意：deleteTask函数的参数名应该对应接口的taskid（小写）
+        await deleteTask(taskId)
         await this.loadTasks()
+        alert('删除成功！')
       } catch (error) {
         console.error('删除任务失败:', error)
         alert('删除失败，请重试')
       }
     },
 
-    async toggleTaskStatus(task) {
-      try {
-        let newStatus
-        if (task.status === '未完成' || task.status === '未开始') {
-          newStatus = '进行中'
-        } else if (task.status === '进行中') {
-          newStatus = '已完成'
-        } else {
-          return
-        }
+    // 模态框管理
+    openCreateModal() {
+      this.editingTask = null
+      this.resetTaskForm()
+      this.showModal = true
+    },
 
-        const taskId = task.task_id || task.taskId
-        const updateData = {
-          task_name: task.task_name || task.taskName,
-          task_note: task.task_note || task.taskNote || null,
-          task_id: taskId,
-          status: newStatus
-        }
-        
-        const response = await updateTask(taskId, updateData)
-        console.log('更新状态响应:', response)
-        
-        // 检查响应
-        if (response.success === false || response.success === "false") {
-          alert(response.message || '更新任务状态失败')
-          return
-        }
-        
-        await this.loadTasks()
-      } catch (error) {
-        console.error('更新任务状态失败:', error)
-        alert('更新任务状态失败: ' + (error.message || '未知错误'))
+    editTask(task) {
+      this.editingTask = task
+      this.taskForm = {
+        task_name: this.getTaskName(task),
+        task_note: this.getTaskNote(task) || '',
+        duration: task.duration || 25
       }
+      this.showModal = true
     },
 
     closeModal() {
-      this.showCreateModal = false
+      this.showModal = false
       this.editingTask = null
+      this.resetTaskForm()
+    },
+
+    resetTaskForm() {
       this.taskForm = {
         task_name: '',
         task_note: '',
@@ -421,6 +514,7 @@ export default {
       }
     },
 
+    // 路由跳转
     goToHome() {
       this.$router.push('/')
     },
@@ -435,6 +529,7 @@ export default {
   }
 }
 </script>
+
 
 <style scoped>
 /* 使用白色背景 */
@@ -683,22 +778,40 @@ export default {
   transition: all 0.2s ease;
 }
 
-.status-btn {
+/* ✅ 完成按钮（原本的橙色） */
+.complete-btn {
   background: #eeaa67;
   color: white;
   border-color: #eeaa67;
 }
 
-.status-btn:hover {
+.complete-btn:hover {
   background: #e69c55;
+  border-color: #e69c55;
 }
 
+/* ✅ 已完成按钮（灰色） */
+.completed-btn {
+  background: #bdc3c7 !important;
+  border-color: #95a5a6 !important;
+  cursor: not-allowed !important;
+  opacity: 0.7;
+}
+
+.completed-btn:hover {
+  background: #bdc3c7 !important;
+  transform: none !important;
+  box-shadow: none !important;
+}
+
+/* 编辑按钮样式 */
 .edit-btn:hover {
   background: #fff9f2;
   border-color: #eeaa67;
   color: #e69c55;
 }
 
+/* 删除按钮样式 */
 .delete-btn:hover {
   background: #fff5f5;
   border-color: #ff8787;
@@ -1019,5 +1132,10 @@ export default {
   .form-actions {
     flex-direction: column;
   }
+
+  .task-已完成 {
+  border-left: 4px solid #28a745;
+  opacity: 0.8;
+}
 }
 </style>
