@@ -9,6 +9,7 @@
         <a class="nav-link" @click="goToProfile">个人中心</a>
       </div>
       <div class="user-avatar-container">
+        <div class="user-name">{{ userInfo.username }}</div>
         <div 
           class="user-avatar" 
           @mouseenter="showDropdown = true"
@@ -555,26 +556,6 @@ export default {
   color: #333;
 }
 
-.quick-join-item:hover {
-  border-color: #eeaa67; /* 橘黄色边框 */
-  background: #fffaf5; /* 浅橘黄色背景 */
-}
-
-.join-btn {
-  padding: 6px 12px;
-  background: #eeaa67; /* 橘黄色按钮 */
-  color: white;
-  border: none;
-  border-radius: 6px;
-  cursor: pointer;
-  font-size: 0.9em;
-  transition: background-color 0.2s;
-}
-
-.join-btn:hover {
-  background: #e69c55; /* 深橘黄色 */
-}
-
 /* 右侧边栏按钮 */
 .btn-primary {
   background: linear-gradient(135deg, #eeaa67, #f5b877); /* 橘黄色渐变 */
@@ -611,6 +592,16 @@ export default {
 
 .user-avatar-container {
   position: relative;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.user-name {
+  font-size: 14px;
+  color: #333;
+  font-weight: 500;
+  cursor: default;
 }
 
 .user-avatar {

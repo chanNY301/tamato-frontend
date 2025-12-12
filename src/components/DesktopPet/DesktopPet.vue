@@ -21,12 +21,28 @@
     <div v-if="showBubble" class="pet-bubble" :class="{ 'bubble-visible': showBubble }">
       {{ bubbleText }}
     </div>
+    
+    <!-- 功能菜单 -->
+    <div v-if="showMenu" class="pet-menu" :class="{ 'menu-visible': showMenu }">
+      <div class="menu-item" @click="openChat">
+        <span class="menu-icon">💬</span>
+        <span class="menu-text">聊天</span>
+      </div>
+    </div>
+    
+    <!-- 聊天对话框 -->
+    <ChatDialog :visible="showChatDialog" @close="closeChatDialog" />
   </div>
 </template>
 
 <script>
+import ChatDialog from './ChatDialog.vue'
+
 export default {
   name: 'DesktopPet',
+  components: {
+    ChatDialog
+  },
   data() {
     return {
       // 位置
@@ -52,6 +68,9 @@ export default {
       showBubble: false,
       bubbleText: '',
       clickCount: 0,
+      showMenu: false,
+      menuTimer: null,
+      showChatDialog: false,
       
       // 待机动画
       idleAnimationTimer: null
@@ -88,6 +107,8 @@ export default {
     window.addEventListener('mousemove', this.onMouseMove)
     window.addEventListener('mouseup', this.stopDrag)
     window.addEventListener('resize', this.handleResize)
+    // 登录时显示时间段问候语
+    this.showTimeGreeting()
   },
   beforeUnmount() {
     this.stopAllTimers()
@@ -134,20 +155,17 @@ export default {
     },
     
     // 点击交互
-    handleClick() {
+    handleClick(e) {
+      // 如果点击的是菜单项，不处理
+      if (e.target.closest('.pet-menu')) {
+        return
+      }
+      
       this.clickCount++
       
-      // 显示不同的对话
-      const messages = [
-        '你好！我是番茄桌宠 🍅',
-        '今天也要努力学习哦！',
-        '记得完成待办任务～',
-        '加油！你可以的！',
-        '记得签到领取番茄哦 🎁'
-      ]
-      
-      const randomMessage = messages[Math.floor(Math.random() * messages.length)]
-      this.showBubbleMessage(randomMessage)
+      // 显示功能菜单
+      this.showMenu = true
+      this.hideMenuAfterDelay()
       
       // 点击动画
       this.animationState = 'happy'
@@ -156,6 +174,30 @@ export default {
           this.animationState = 'idle'
         }
       }, 500)
+    },
+    
+    // 延迟隐藏菜单
+    hideMenuAfterDelay() {
+      if (this.menuTimer) {
+        clearTimeout(this.menuTimer)
+      }
+      this.menuTimer = setTimeout(() => {
+        this.showMenu = false
+      }, 3000)
+    },
+    
+    // 打开聊天对话框
+    openChat() {
+      this.showChatDialog = true
+      this.showMenu = false
+      if (this.menuTimer) {
+        clearTimeout(this.menuTimer)
+      }
+    },
+    
+    // 关闭聊天对话框
+    closeChatDialog() {
+      this.showChatDialog = false
     },
     
     showBubbleMessage(text) {
@@ -268,6 +310,44 @@ export default {
         clearInterval(this.idleAnimationTimer)
         this.idleAnimationTimer = null
       }
+      if (this.menuTimer) {
+        clearTimeout(this.menuTimer)
+        this.menuTimer = null
+      }
+    },
+    
+    // 获取时间段问候语
+    getTimeGreeting() {
+      const hour = new Date().getHours()
+      
+      if (hour >= 6 && hour < 9) {
+        // 早上 6:00 - 9:00
+        return '早上好呀，一日之计在于晨，快开始今天的学习吧！'
+      } else if (hour >= 9 && hour < 12) {
+        // 上午 9:00 - 12:00
+        return '上午好！新的一天开始了，让我们一起加油学习吧！'
+      } else if (hour >= 12 && hour < 14) {
+        // 中午 12:00 - 14:00
+        return '中午好！记得适当休息，下午继续努力哦！'
+      } else if (hour >= 14 && hour < 18) {
+        // 下午 14:00 - 18:00
+        return '下午好！下午时光很宝贵，保持专注继续学习吧！'
+      } else if (hour >= 18 && hour < 22) {
+        // 晚上 18:00 - 22:00
+        return '晚上好！今天的学习任务完成得怎么样？继续加油！'
+      } else {
+        // 深夜 22:00 - 6:00
+        return '夜深了，还在学习吗？记得早点休息，保持身体健康哦！'
+      }
+    },
+    
+    // 显示时间段问候语
+    showTimeGreeting() {
+      const greeting = this.getTimeGreeting()
+      // 延迟一点显示，让组件完全加载
+      setTimeout(() => {
+        this.showBubbleMessage(greeting)
+      }, 500)
     }
   }
 }
@@ -446,6 +526,66 @@ export default {
   border-right-color: white;
 }
 
+/* 功能菜单 */
+.pet-menu {
+  position: absolute;
+  left: 100%;
+  top: 50%;
+  transform: translateY(-50%);
+  margin-left: 15px;
+  background: white;
+  border-radius: 12px;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.15);
+  padding: 8px;
+  min-width: 120px;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.3s ease, transform 0.3s ease;
+  z-index: 10001;
+  direction: ltr;
+  text-align: left;
+}
+
+.pet-menu.menu-visible {
+  opacity: 1;
+  pointer-events: auto;
+  transform: translateY(-50%) translateX(5px);
+}
+
+.pet-menu::before {
+  content: '';
+  position: absolute;
+  right: 100%;
+  top: 50%;
+  transform: translateY(-50%);
+  border: 8px solid transparent;
+  border-right-color: white;
+}
+
+.menu-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 12px;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: background-color 0.2s;
+}
+
+.menu-item:hover {
+  background-color: #f5f5f5;
+}
+
+.menu-icon {
+  font-size: 18px;
+}
+
+.menu-text {
+  font-size: 14px;
+  color: #333;
+  font-weight: 500;
+}
+
 /* 响应式 */
 @media (max-width: 768px) {
   .desktop-pet {
@@ -460,6 +600,10 @@ export default {
   .pet-bubble {
     max-width: 150px;
     font-size: 12px;
+  }
+  
+  .pet-menu {
+    min-width: 100px;
   }
 }
 </style>
