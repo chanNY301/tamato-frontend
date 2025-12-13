@@ -2,12 +2,9 @@ import request from './request'
 import { API_BASE_URL } from './config'
 
 // 搜索用户（通过用户名）
-// 注意：后端可能没有专门的搜索API，这里先返回一个占位实现
-// 实际使用时，如果后端有搜索接口，可以替换为真实的API调用
+// 只有ID存在的用户名才可以被搜索到
 export const searchUser = async (username) => {
-  // 暂时返回一个错误，提示用户直接输入用户名发送申请
-  // 后续如果后端提供搜索接口，可以在这里实现
-  return Promise.reject(new Error(`搜索功能暂未实现，请直接输入用户名"${username}"发送好友申请`))
+  return request.get(`${API_BASE_URL}/users/${encodeURIComponent(username)}`)
 }
 
 // 发送好友申请

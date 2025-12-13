@@ -88,6 +88,30 @@ const request = {
         ...options
       })
       
+      // 先尝试解析响应体（可能是 JSON 格式的错误信息）
+      let result
+      const contentType = response.headers.get('content-type')
+      if (contentType && contentType.includes('application/json')) {
+        try {
+          result = await response.json()
+          // 如果是404错误，返回错误信息
+          if (response.status === 404) {
+            const error = new Error(result.message || '用户不存在')
+            error.status = 404
+            error.response = response
+            throw error
+          }
+          // 如果响应是 JSON 格式且成功，直接返回
+          if (response.ok) {
+            console.log('✅ GET请求成功:', result)
+            return result
+          }
+        } catch (e) {
+          // JSON 解析失败，继续使用文本方式
+          console.error('JSON 解析失败:', e)
+        }
+      }
+      
       if (!response.ok) {
         let errorText = ''
         try {
@@ -102,13 +126,22 @@ const request = {
         throw error
       }
       
-      const result = await response.json()
+      // 如果 response.ok 为 true，但 result 还未设置，再次解析
+      if (!result) {
+        result = await response.json()
+      }
       console.log('✅ GET请求成功:', result)
       return result
     } catch (error) {
       console.error('❌ GET请求失败:', error)
       // 如果是网络错误（无法连接到服务器）
-      if (error.name === 'TypeError' && error.message.includes('fetch')) {
+      if (error.name === 'TypeError' && (error.message.includes('fetch') || error.message.includes('Failed to fetch'))) {
+        const networkError = new Error('无法连接到服务器，请确保后端服务正在运行 (http://localhost:8090)')
+        networkError.isNetworkError = true
+        throw networkError
+      }
+      // 如果是代理错误
+      if (error.message.includes('ECONNREFUSED') || error.message.includes('proxy')) {
         const networkError = new Error('无法连接到服务器，请确保后端服务正在运行 (http://localhost:8090)')
         networkError.isNetworkError = true
         throw networkError
