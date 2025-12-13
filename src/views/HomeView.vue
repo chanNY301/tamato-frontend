@@ -338,13 +338,78 @@ export default {
       // 例如：显示提示、更新其他数据等
     },
 
-    handleJoinRoom(roomId) {
-      console.log('加入房间:', roomId)
-      // 跳转到自习室页面
-      this.$router.push({
-        name: 'study-room',
-        params: { roomId: roomId }
-      })
+    async handleJoinRoom(roomId) {
+      console.log('快速加入房间:', roomId)
+      
+      try {
+        // 先获取用户信息
+        const { getCurrentUser } = await import('@/api/user')
+        const userResponse = await getCurrentUser()
+        
+        if (!userResponse.success || !userResponse.data) {
+          alert('获取用户信息失败，请重新登录')
+          return
+        }
+        
+        const currentUser = userResponse.data
+        const userId = currentUser.id || currentUser.userId || currentUser.user_id
+        
+        if (!userId) {
+          alert('用户身份验证失败，请重新登录')
+          return
+        }
+        
+        // 将用户ID转换为数字
+        const userIdNumber = Number(userId)
+        if (isNaN(userIdNumber)) {
+          console.error('用户ID不是有效的数字:', userId)
+          alert('用户ID格式错误')
+          return
+        }
+        
+        console.log(`调用加入房间API: roomId=${roomId}, userId=${userIdNumber}`)
+        
+        // 调用加入房间API
+        const { joinRoom } = await import('@/api/studyRooms')
+        const joinResult = await joinRoom(roomId, userIdNumber)
+        
+        console.log('加入房间响应:', joinResult)
+        
+        // 检查加入结果
+        if (joinResult && (joinResult.code === 200 || joinResult.success === true)) {
+          console.log('✅ 加入房间成功，跳转到自习室页面')
+          // 加入成功，跳转到自习室页面
+          this.$router.push({
+            name: 'study-room',
+            params: { roomId: roomId }
+          })
+        } else {
+          // 如果已经在房间中（409），也允许跳转
+          if (joinResult?.message?.includes('已在') || joinResult?.code === 409) {
+            console.log('用户已在房间中，直接跳转')
+            this.$router.push({
+              name: 'study-room',
+              params: { roomId: roomId }
+            })
+          } else {
+            const errorMsg = joinResult?.message || '加入失败，请重试'
+            alert(`加入失败: ${errorMsg}`)
+          }
+        }
+      } catch (error) {
+        console.error('快速加入房间失败:', error)
+        
+        // 如果是409（已在房间中），允许跳转
+        if (error.status === 409 || error.message?.includes('已在')) {
+          console.log('用户已在房间中，直接跳转')
+          this.$router.push({
+            name: 'study-room',
+            params: { roomId: roomId }
+          })
+        } else {
+          alert(`加入失败: ${error.message || '网络错误，请稍后重试'}`)
+        }
+      }
     }
   }
 }

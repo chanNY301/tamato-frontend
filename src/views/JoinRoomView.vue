@@ -19,7 +19,7 @@
         <!-- 左侧：输入加入码 -->
         <div class="join-method-card code-join-section">
           <div class="method-header">
-            <div class="method-icon"></div>
+            <div class="method-icon">🔑</div>
             <h2 class="method-title">输入加入码加入</h2>
           </div>
           
@@ -29,7 +29,7 @@
               <input 
                 type="text" 
                 v-model="joinCode" 
-                placeholder="请输入房间号"
+                placeholder="请输入6位房间号"
                 class="form-input"
                 :disabled="loading"
                 maxlength="6"
@@ -37,6 +37,9 @@
               >
               <div v-if="errorMessage" class="error-message">
                 {{ errorMessage }}
+              </div>
+              <div v-if="successMessage" class="success-message">
+                {{ successMessage }}
               </div>
             </div>
 
@@ -46,7 +49,9 @@
                 @click="validateAndJoin"
                 :disabled="loading || !joinCode.trim()"
               >
-                <span v-if="loading">验证中...</span>
+                <span v-if="loading">
+                  <span class="loading-spinner"></span> 处理中...
+                </span>
                 <span v-else>确认加入</span>
               </button>
               <button 
@@ -68,20 +73,16 @@
         <!-- 右侧：快速加入 -->
         <div class="join-method-card quick-join-section">
           <div class="method-header">
-            <div class="method-icon"></div>
+            <div class="method-icon">⚡</div>
             <h2 class="method-title">快速加入</h2>
           </div>
           
           <div class="method-content">
-            <!-- 预留动态内容区域 -->
             <div class="dynamic-content-placeholder">
-              <div class="placeholder-icon"></div>
+              <div class="placeholder-icon">📚</div>
               <p class="placeholder-text">热门自习室将在这里显示</p>
               <p class="placeholder-subtext">内容动态加载中...</p>
             </div>
-            
-            <!-- 这里可以插入动态内容 -->
-            <slot name="quick-join-content"></slot>
           </div>
         </div>
       </div>
@@ -102,12 +103,32 @@
           </div>
         </div>
       </div>
+
+      <!-- 房间已满提示弹窗 -->
+      <div v-if="showRoomFull" class="room-not-found-modal">
+        <div class="modal-overlay" @click="closeRoomFull">
+          <div class="modal-content" @click.stop>
+            <div class="modal-header">
+              <h3>房间已满</h3>
+            </div>
+            <div class="modal-body">
+              <p>房间号 <strong>{{ joinCode }}</strong> 已满员，无法加入。</p>
+              <p class="tip-text">建议创建新的自习室或稍后再试。</p>
+            </div>
+            <div class="modal-footer">
+              <button class="modal-btn" @click="closeRoomFull">确定</button>
+              <button class="modal-btn secondary" @click="goToCreateRoom">创建新房间</button>
+            </div>
+          </div>
+        </div>
+      </div>
     </main>
   </div>
 </template>
 
 <script>
-import { getRoomDetail } from '@/api/studyRooms'
+import { getRoomDetail, joinRoom } from '@/api/studyRooms'
+import { getCurrentUser } from '@/api/user'
 
 export default {
   name: 'JoinRoomView',
@@ -116,65 +137,191 @@ export default {
       joinCode: '',
       loading: false,
       errorMessage: '',
-      showRoomNotFound: false
+      successMessage: '',
+      showRoomNotFound: false,
+      showRoomFull: false,
+      currentUser: null,
+      currentUserId: null
     }
   },
+  async mounted() {
+    await this.loadCurrentUser()
+    
+    this.$nextTick(() => {
+      const input = this.$el.querySelector('.form-input')
+      if (input) input.focus()
+    })
+  },
   methods: {
-    // 验证房间并加入
+    async loadCurrentUser() {
+      try {
+        const response = await getCurrentUser()
+        
+        if (response.success && response.data) {
+          this.currentUser = response.data
+          this.currentUserId = response.data.id || 
+                               response.data.userId || 
+                               response.data.user_id
+          
+          console.log('当前用户信息:', this.currentUser)
+          console.log('用户ID:', this.currentUserId)
+          
+          if (!this.currentUserId) {
+            console.warn('无法获取用户ID')
+          }
+        }
+      } catch (error) {
+        console.error('获取用户信息失败:', error)
+      }
+    },
+    
     async validateAndJoin() {
-      if (!this.joinCode.trim()) {
+      const roomId = this.joinCode.trim()
+      
+      if (!roomId) {
         this.errorMessage = '请输入房间号'
+        return
+      }
+      
+      if (!/^[A-Za-z0-9]{6}$/.test(roomId)) {
+        this.errorMessage = '房间号应为6位数字或字母'
         return
       }
       
       this.loading = true
       this.errorMessage = ''
+      this.successMessage = ''
       
       try {
-        // 1. 验证房间是否存在
-        console.log('验证房间是否存在:', this.joinCode)
-        const response = await getRoomDetail(this.joinCode)
+        console.log(`=== 开始加入房间流程 ===`)
+        console.log(`房间ID: ${roomId}`)
         
-        console.log('房间验证响应:', response)
-        
-        // 2. 根据响应判断房间是否存在
-        if (response && response.code === 200 && response.data) {
-          // 房间存在，可以进入
-          console.log('房间存在，跳转到房间页面')
-          this.$router.push(`/study-room/${this.joinCode}`)
-        } else {
-          // 房间不存在，显示错误弹窗
-          console.log('房间不存在，显示错误提示')
-          this.showRoomNotFound = true
+        // 确保有用户ID
+        if (!this.currentUserId) {
+          await this.loadCurrentUser()
         }
-      } catch (error) {
-        console.error('验证房间时出错:', error)
         
-        // 根据错误类型显示不同的提示
-        if (error.response && error.response.status === 404) {
+        if (!this.currentUserId) {
+          this.errorMessage = '用户身份验证失败，请重新登录'
+          return
+        }
+        
+        // 将用户ID转换为数字（后端需要Long类型）
+        const userId = Number(this.currentUserId)
+        if (isNaN(userId)) {
+          console.error('用户ID不是有效的数字:', this.currentUserId)
+          this.errorMessage = '用户ID格式错误'
+          return
+        }
+        
+        console.log(`使用的参数 - 房间ID: ${roomId}, 用户ID: ${userId}`)
+        
+        // 1. 验证房间是否存在
+        console.log(`步骤1: 验证房间 ${roomId} 是否存在...`)
+        const roomDetail = await getRoomDetail(roomId)
+        console.log('房间详情响应:', roomDetail)
+        
+        if (!roomDetail || !(roomDetail.code === 200 || roomDetail.success === true)) {
+          console.warn('房间验证失败')
           this.showRoomNotFound = true
-        } else if (error.response && error.response.status === 403) {
-          this.errorMessage = '该自习室已满员'
+          return
+        }
+        
+        console.log('✅ 房间验证成功')
+        
+        // 2. 加入房间
+        console.log(`步骤2: 调用加入房间API...`)
+        console.log(`请求路径: /api/rooms/${roomId}/join?userId=${userId}`)
+        
+        const joinResult = await joinRoom(roomId, userId)
+        console.log('加入房间响应:', joinResult)
+        
+        if (joinResult && (joinResult.code === 200 || joinResult.success === true)) {
+          console.log('✅ 加入房间成功')
+          this.successMessage = '加入成功！正在跳转...'
+          
+          setTimeout(() => {
+            this.$router.push({
+              name: 'study-room',
+              params: { roomId: roomId }
+            })
+          }, 500)
+          
         } else {
-          this.errorMessage = '验证失败，请检查网络连接'
+          const errorMsg = joinResult?.message || '加入失败，请重试'
+          console.warn('加入房间失败:', errorMsg)
+          
+          if (errorMsg.includes('满') || errorMsg.includes('full')) {
+            this.showRoomFull = true
+          } else {
+            this.errorMessage = errorMsg
+          }
+        }
+        
+      } catch (error) {
+        console.error('加入房间过程中出错:', error)
+        
+        if (error.response) {
+          const { status, data } = error.response
+          console.error(`HTTP ${status}:`, data)
+          
+          switch (status) {
+            case 400:
+              this.errorMessage = data?.message || '请求参数错误'
+              break
+            case 404:
+              this.showRoomNotFound = true
+              break
+            case 403:
+              this.errorMessage = '权限不足，无法加入该自习室'
+              break
+            case 409:
+              this.successMessage = '您已在房间中，正在跳转...'
+              setTimeout(() => {
+                this.$router.push({
+                  name: 'study-room',
+                  params: { roomId: roomId }
+                })
+              }, 500)
+              break
+            case 422:
+              this.showRoomFull = true
+              break
+            case 500:
+              if (data?.message?.includes('MissingServletRequestParameterException')) {
+                this.errorMessage = '服务器参数错误：缺少用户ID参数'
+              } else {
+                this.errorMessage = '服务器内部错误，请稍后重试'
+              }
+              break
+            default:
+              this.errorMessage = data?.message || `服务器错误: ${status}`
+          }
+        } else if (error.request) {
+          this.errorMessage = '网络连接失败，请检查网络设置'
+        } else {
+          this.errorMessage = error.message || '未知错误'
         }
       } finally {
         this.loading = false
+        console.log('=== 加入流程结束 ===')
       }
     },
     
-    // 关闭房间不存在弹窗
     closeRoomNotFound() {
       this.showRoomNotFound = false
-      this.joinCode = '' // 清空输入框，方便重新输入
+      this.joinCode = ''
     },
     
-    // 跳转到创建自习室页面
+    closeRoomFull() {
+      this.showRoomFull = false
+      this.joinCode = ''
+    },
+    
     goToCreateRoom() {
       this.$router.push('/create-room')
     },
     
-    // 返回首页 - 明确跳转到首页路由
     goToHome() {
       this.$router.push('/')
     }
@@ -184,6 +331,35 @@ export default {
 
 
 <style scoped>
+
+/* 成功提示 */
+.success-message {
+  color: #2b8a3e;
+  font-size: 0.9em;
+  margin-top: 8px;
+  padding: 8px 12px;
+  background: #e7f5e9;
+  border-radius: 6px;
+  border-left: 3px solid #2b8a3e;
+}
+
+/* 加载动画 */
+.loading-spinner {
+  display: inline-block;
+  width: 12px;
+  height: 12px;
+  border: 2px solid #fff;
+  border-top: 2px solid transparent;
+  border-radius: 50%;
+  animation: spin 1s linear infinite;
+  margin-right: 6px;
+}
+
+@keyframes spin {
+  0% { transform: rotate(0deg); }
+  100% { transform: rotate(360deg); }
+}
+
 
 /* 错误提示 */
 .error-message {

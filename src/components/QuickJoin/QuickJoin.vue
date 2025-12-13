@@ -145,8 +145,21 @@ export default {
         const response = await getRoomsList()
         console.log('📊 自习室列表API响应:', response)
         
-        if (response && response.data && response.data.list && Array.isArray(response.data.list)) {
-          const roomList = response.data.list
+        // 支持两种数据格式：
+        // 1. response.data 直接是数组
+        // 2. response.data.list 是数组
+        let roomList = null
+        if (response && response.data) {
+          if (Array.isArray(response.data)) {
+            // 格式1: data 直接是数组
+            roomList = response.data
+          } else if (response.data.list && Array.isArray(response.data.list)) {
+            // 格式2: data.list 是数组
+            roomList = response.data.list
+          }
+        }
+        
+        if (roomList && roomList.length > 0) {
           console.log(`✅ 获取到 ${roomList.length} 个自习室`)
           
           // 处理所有房间数据
@@ -164,7 +177,7 @@ export default {
           
           console.log(`🎯 总房间数: ${this.allRooms.length}, 每页: ${this.roomsPerPage}, 总页数: ${this.totalPages}`)
         } else {
-          console.warn('⚠️ API返回数据格式异常', response)
+          console.warn('⚠️ API返回数据格式异常或数据为空', response)
           this.allRooms = []
           this.calculateTotalPages()
           this.updateDisplayedRooms()
@@ -233,11 +246,12 @@ export default {
     },
 
     formatRoomData(room) {
-      const roomId = room.room_id || room.id || 'unknown_' + Date.now()
-      const roomName = room.room_name || room.name || '自习室'
-      const maxMembers = Math.max(room.max_members || room.max_member || 4, 1)
+      // 支持驼峰命名和下划线命名两种格式
+      const roomId = room.roomId || room.room_id || room.id || 'unknown_' + Date.now()
+      const roomName = room.roomName || room.room_name || room.name || '自习室'
+      const maxMembers = Math.max(room.maxMembers || room.max_members || room.max_member || 4, 1)
       
-      let currentMembers = room.current_members || room.current_member || 0
+      let currentMembers = room.currentMembers || room.current_members || room.current_member || 0
       currentMembers = Math.min(Math.max(currentMembers, 0), maxMembers)
       
       // 随机生成在线人数（为了显示效果）
@@ -245,15 +259,17 @@ export default {
         currentMembers = Math.floor(Math.random() * maxMembers) + 1
       }
       
-      const isActive = room.end_time ? (Date.now() / 1000 < room.end_time) : true
+      // 支持 endTime (时间戳毫秒) 和 end_time (时间戳秒) 两种格式
+      const endTime = room.endTime || room.end_time
+      const isActive = endTime ? (Date.now() < (endTime > 1000000000000 ? endTime : endTime * 1000)) : true
       
       return {
         room_id: roomId,
         room_name: roomName,
-        create_person: room.create_person || room.creator || room.owner || '未知用户',
+        create_person: room.createPerson || room.create_person || room.creator || room.owner || '未知用户',
         max_members: maxMembers,
         current_members: currentMembers,
-        music_name: room.music_name || room.music || '无背景音乐',
+        music_name: room.musicName || room.music_name || room.music || '无背景音乐',
         is_active: isActive
       }
     },
