@@ -207,18 +207,35 @@ export default {
       statusTabs: [
         { label: '全部', value: 'all' },
         { label: '未完成', value: '未完成' },
-        { label: '进行中', value: '进行中' },
         { label: '已完成', value: '已完成' }
       ]
     }
   },
   computed: {
+    // 将已完成的任务排在列表底部，其余任务在前面
+    sortedTasks() {
+      return [...this.tasks].sort((a, b) => {
+        const aCompleted = this.getStatusText(a.status) === '已完成'
+        const bCompleted = this.getStatusText(b.status) === '已完成'
+
+        // 已完成的排到最后
+        if (aCompleted !== bCompleted) {
+          return aCompleted - bCompleted // false(0) 在前，true(1) 在后
+        }
+
+        // 同一类里，按创建时间倒序（新的在前）
+        const aTime = new Date(a.created_at || a.createdAt || 0).getTime()
+        const bTime = new Date(b.created_at || b.createdAt || 0).getTime()
+        return bTime - aTime
+      })
+    },
     filteredTasks() {
+      const base = this.sortedTasks
       if (this.activeTab === 'all') {
-        return this.tasks
+        return base
       }
       
-      return this.tasks.filter(task => {
+      return base.filter(task => {
         const status = this.getStatusText(task.status)
         return status === this.activeTab
       })
@@ -228,6 +245,9 @@ export default {
     },
     completedTasks() {
       return this.tasks.filter(task => this.isTaskCompleted(task)).length
+    },
+    pendingTasks() {
+      return this.tasks.filter(task => !this.isTaskCompleted(task)).length
     },
     inProgressTasks() {
       return this.tasks.filter(task => this.getStatusText(task.status) === '进行中').length
@@ -374,42 +394,74 @@ export default {
       
       try {
         const taskId = this.getTaskId(task)
+        if (!taskId) {
+          alert('任务ID不存在，无法完成')
+          return
+        }
+        
+        if (!this.userId) {
+          alert('用户ID不存在，请重新登录')
+          this.$router.push('/login')
+          return
+        }
+        
         const updateData = {
           task_name: this.getTaskName(task),
+          task_note: this.getTaskNote(task) || null,
           user_id: this.userId,
-          status: '已完成'
+          userId: this.userId,  // 同时发送两种格式
+          status: '已完成',
+          taskStatus: '已完成'  // 同时发送两种可能的字段名
         }
         
-        console.log('完成任务请求:', { taskId, updateData })
+        console.log('📋 完成任务 - 准备发送的数据:', {
+          taskId: taskId,
+          updateData: updateData,
+          '完整请求体（包含task_id后）': {
+            ...updateData,
+            task_id: taskId,
+            taskId: taskId
+          }
+        })
         
         const response = await updateTask(taskId, updateData)
-        console.log('完成任务响应:', response)
+        console.log('✅ 完成任务响应:', response)
         
-        // 方法1：使用更安全的方式更新状态（不依赖 $set）
-        const taskIndex = this.tasks.findIndex(t => this.getTaskId(t) === taskId)
-        if (taskIndex !== -1) {
-          // 创建新对象，避免响应式问题
-          const updatedTask = {
-            ...this.tasks[taskIndex],
-            status: '已完成'
-          }
-          this.tasks.splice(taskIndex, 1, updatedTask)
+        // 详细检查响应内容
+        if (response) {
+          console.log('📊 响应详情:', {
+            success: response.success,
+            message: response.message,
+            data: response.data,
+            '响应中的任务状态': response.data?.status || response.status
+          })
         }
         
-        // 不显示弹窗，避免干扰用户体验
-        // alert('任务已完成！')
+        // 检查响应是否成功
+        if (response && (response.success === false || response.success === "false")) {
+          alert(response.message || '标记完成失败')
+          return
+        }
+        
+        // 重新加载任务列表以确保数据同步
+        await this.loadTasks()
+        
+        // 显示成功提示
+        console.log('任务已成功标记为完成')
         
       } catch (error) {
         console.error('完成任务失败:', error)
         // 更友好的错误提示
-        if (error.response && error.response.status === 401) {
+        if (error.status === 401 || (error.response && error.response.status === 401)) {
           alert('请先登录')
           this.$router.push('/login')
-        } else if (error.response && error.response.status === 404) {
+        } else if (error.status === 404 || (error.response && error.response.status === 404)) {
           alert('任务不存在或已被删除')
           await this.loadTasks() // 重新加载任务列表
         } else {
-          alert('标记完成失败，请稍后重试')
+          const errorMsg = error.message || '标记完成失败，请稍后重试'
+          alert(errorMsg)
+          console.error('完整错误信息:', error)
         }
       }
     },
@@ -423,8 +475,9 @@ export default {
           const updateData = {
             task_name: this.taskForm.task_name,
             task_note: this.taskForm.task_note || null,
-            // 编辑时不需要传duration，因为接口文档没有
-            user_id: this.userId  // 根据接口文档添加user_id
+            // ✅ 编辑时也一并更新计划时长
+            duration: parseInt(this.taskForm.duration) || 25,
+            user_id: this.userId
           }
           
           console.log('编辑任务数据:', updateData)

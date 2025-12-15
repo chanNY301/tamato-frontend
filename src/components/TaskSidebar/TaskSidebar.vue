@@ -74,11 +74,11 @@ export default {
     }
   },
   computed: {
-    // 未完成的任务（包括进行中和未完成）
+    // 未完成的任务（包括进行中和未完成），已完成的不显示在侧边栏
     pendingTasks() {
       return this.tasks.filter(task => {
-        const status = task.status || task.taskStatus
-        return status === '未完成' || status === '进行中' || status === '未开始'
+        const statusText = this.getStatusText(task.status || task.taskStatus)
+        return statusText !== '已完成'
       })
     },
     totalTasks() {
@@ -106,11 +106,19 @@ export default {
     async initUser() {
       try {
         const userResult = await getCurrentUser()
-        if (userResult.success && userResult.data) {
-          this.userId = userResult.data.user_id
-        } else {
-          console.error('获取用户信息失败')
+        console.log('TaskSidebar用户信息响应:', userResult)
+        
+        if (userResult && userResult.data) {
+          // 根据user.js的返回结构，user_id可能在不同的位置
+          if (userResult.data.user_id) {
+            this.userId = userResult.data.user_id
+          } else if (userResult.data.id) {
+            this.userId = userResult.data.id
+          } else {
+            console.warn('未找到user_id字段，用户数据:', userResult.data)
+          }
         }
+        console.log('TaskSidebar获取到的userId:', this.userId)
       } catch (error) {
         console.error('初始化用户失败:', error)
       }
@@ -162,7 +170,8 @@ export default {
         const updateData = {
           task_name: task.task_name || task.taskName,
           task_note: task.task_note || task.taskNote || null,
-          task_id: taskId
+          user_id: this.userId,
+          status: newStatus
         }
         
         const response = await updateTask(taskId, updateData)
@@ -187,13 +196,33 @@ export default {
       }
     },
 
+    // 与任务管理页保持一致的状态文案
     getStatusText(status) {
-      const statusMap = {
-        '未完成': '未开始',
-        '进行中': '进行中',
-        '已完成': '已完成'
+      if (!status) return '未完成'
+      
+      const statusStr = String(status).trim().toLowerCase()
+      
+      if (
+        statusStr === '已完成' || 
+        statusStr === '完成' ||
+        statusStr === 'finished' || 
+        statusStr === 'done' ||
+        statusStr === '已完'
+      ) {
+        return '已完成'
       }
-      return statusMap[status] || status
+      
+      if (
+        statusStr === '进行中' ||
+        statusStr === '进行' ||
+        statusStr === 'in_progress' ||
+        statusStr === 'in progress' ||
+        statusStr === 'doing'
+      ) {
+        return '进行中'
+      }
+      
+      return '未完成'
     },
 
     formatTime(timeStr) {
