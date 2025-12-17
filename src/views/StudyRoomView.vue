@@ -11,7 +11,7 @@
           class="nav-link disband-nav-btn"
           title="解散自习室（房主专用）"
         >
-          🗑️ 解散自习室
+           解散自习室
         </button>
         <button 
           v-else 
@@ -78,17 +78,17 @@
         <div class="room-layout">
           <!-- 左侧：番茄钟和工作区 -->
           <div class="left-section">
-            <div class="timer-section">
-              <PomodoroTimer
-                :key="roomId"
-                @timer-started="handleTimerStart"
-                @timer-paused="handleTimerPause"
-                @timer-resumed="handleTimerResume"
-                @timer-stopped="handleTimerStop"
-                @focus-completed="handleFocusCompleted"
-                @break-skipped="handleBreakSkipped"
-              />
-            </div>
+            <PomodoroTimer
+              class="timer-component"
+              :key="roomId"
+              @timer-started="handleTimerStart"
+              @timer-paused="handleTimerPause"
+              @timer-resumed="handleTimerResume"
+              @timer-stopped="handleTimerStop"
+              @focus-completed="handleFocusCompleted"
+              @break-skipped="handleBreakSkipped"
+              @user-status-change="handleUserStatusChange" 
+            />
 
             <!-- 用户状态控制 -->
             <div class="user-status-section">
@@ -241,15 +241,80 @@ export default {
     }
   },
   methods: {
+    // 处理用户状态变化（新方法）
+    handleUserStatusChange(status) {
+      console.log('番茄钟状态变化:', status)
+      this.syncLocalStatus(status)
+      
+      // 同步到后端服务器（这里需要调用你的API）
+      this.syncStatusToServer(status)
+    },
+
+    // 同步状态到服务器
+    async syncStatusToServer(status) {
+      try {
+        // 这里需要调用你的后端API来更新用户状态
+        // 示例：await updateUserStatus(this.roomId, this.currentUserId, status)
+        console.log('正在同步状态到服务器:', {
+          roomId: this.roomId,
+          userId: this.currentUserId,
+          status: status
+        })
+        
+        // 临时模拟：更新当前用户的专注开始时间
+        if (status === 'focusing') {
+          this.userStatus.focusStartTime = Date.now()
+        }
+      } catch (error) {
+        console.error('同步状态到服务器失败:', error)
+      }
+    },
+
+    // 修改 syncLocalStatus 方法
     syncLocalStatus(status) {
       const isFocus = status === 'focusing'
       this.hasStartedFocus = isFocus
-      // 同步“我的状态”展示
       this.userStatus.isFocusing = isFocus
-      // 同步右侧成员列表
+      
+      if (isFocus) {
+        this.startFocusTimer()
+      } else {
+        this.stopFocusTimer()
+      }
+      
       this.updateMemberStatusLocally(status)
-      // 仅有成员列表接口时，主动拉取一次以获取后端状态
       this.loadMembersData().catch(err => console.error('刷新成员列表失败:', err))
+    },
+
+    // 番茄钟事件处理（简化）
+    handleTimerStart() {
+      console.log('番茄钟开始')
+      // 这个事件已经被 handleUserStatusChange 处理了
+    },
+    
+    handleTimerPause() {
+      console.log('番茄钟暂停')
+      // 暂停时状态不变，还是专注
+    },
+    
+    handleTimerResume() {
+      console.log('番茄钟继续')
+      // 这个事件已经被 handleUserStatusChange 处理了
+    },
+    
+    handleTimerStop() {
+      console.log('番茄钟停止')
+      // 这个事件已经被 handleUserStatusChange 处理了
+    },
+    
+    handleFocusCompleted(sessions) {
+      console.log(`专注完成，已完成 ${sessions} 个番茄`)
+      // 这个事件已经被 handleUserStatusChange 处理了
+    },
+    
+    handleBreakSkipped() {
+      console.log('休息被跳过')
+      // 这个事件已经被 handleUserStatusChange 处理了
     },
 
     // 加载当前用户信息
@@ -376,9 +441,13 @@ export default {
               return 'resting'
             })()
 
-            // 进入房间时，如果后端默认给了“专注中”，但前端还未开始番茄钟，则强制展示休息中，避免一进房就专注
+            // 进入房间时，如果后端默认给了"专注中"，但前端还未开始番茄钟，则保持后端状态
+            // 不再强制设置为休息中，让用户自主控制番茄钟状态
+            // 但需要确保用户状态与番茄钟实际运行状态一致
             if (isCurrentUser && !this.hasStartedFocus) {
-              normalizedStatus = 'resting'
+              // 如果用户手动启动了番茄钟，以番茄钟状态为准
+              // 否则保持后端返回的状态
+              // this.hasStartedFocus 会在番茄钟开始时被设置为 true
             }
 
             return {
@@ -562,38 +631,6 @@ export default {
     getInitials(name) {
       if (!name) return '?'
       return name.charAt(0).toUpperCase()
-    },
-
-    // 番茄钟事件
-    handleTimerStart() {
-      console.log('番茄钟开始')
-      this.syncLocalStatus('focusing')
-    },
-    
-    handleTimerPause() {
-      console.log('番茄钟暂停')
-      // 仍视为专注态，不切换状态
-    },
-    
-    handleTimerResume() {
-      console.log('番茄钟继续')
-      this.syncLocalStatus('focusing')
-    },
-    
-    handleTimerStop() {
-      console.log('番茄钟停止')
-      this.syncLocalStatus('resting')
-    },
-    
-    handleFocusCompleted(sessions) {
-      console.log(`专注完成，已完成 ${sessions} 个番茄`)
-      // 进入休息
-      this.syncLocalStatus('resting')
-    },
-    
-    handleBreakSkipped() {
-      console.log('休息被跳过')
-      this.syncLocalStatus('focusing')
     },
 
     showRoomSettings() {
@@ -1175,12 +1212,18 @@ export default {
   gap: 20px;
 }
 
-.timer-section {
+/* 番茄钟组件样式 */
+.timer-component {
   background: white;
   border-radius: 16px;
   padding: 30px;
   box-shadow: 0 4px 20px rgba(0, 0, 0, 0.08);
   border: 1px solid #e9ecef;
+  width: 100%;
+  height: 100%; /* 让高度自动适应 */
+  min-height: 550px; /* 设置最小高度与下方一致 */
+  display: flex;
+  flex-direction: column;
 }
 
 .user-status-section {

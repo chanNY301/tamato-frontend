@@ -2,18 +2,17 @@
   <div class="pomodoro-timer">
     <!-- 初始状态 -->
     <div v-if="!isActive" class="timer-start-screen">
-    <!-- 替换为图片 -->
-    <img src="@/assets/logo.png" alt="番茄时钟" class="pomodoro-logo">
-    <h2 class="timer-title">番茄时钟</h2>
-    <p class="timer-subtitle">专注 · 高效 · 平衡</p>
-    <div class="encouragement-card">
+      <img src="@/assets/logo.png" alt="番茄时钟" class="pomodoro-logo">
+      <h2 class="timer-title">番茄时钟</h2>
+      <p class="timer-subtitle">专注 · 高效 · 平衡</p>
+      <div class="encouragement-card">
         <div class="quote-icon">"</div>
         <p class="encouragement-text">{{ currentEncouragement }}</p>
-    </div>
-    <button @click="startTimer" class="start-button" :disabled="isLoading">
+      </div>
+      <button @click="startTimer" class="start-button" :disabled="isLoading">
         <span v-if="isLoading" class="loading-spinner-small"></span>
         <span v-else>{{ isLoading ? '准备中...' : '开始专注' }}</span>
-    </button>
+      </button>
     </div>
 
     <!-- 激活状态 -->
@@ -36,7 +35,7 @@
         </div>
 
         <!-- 进度环 -->
-        <svg class="progress-ring" width="240" height="240">
+        <svg class="progress-ring" width="280" height="280">
           <defs>
             <linearGradient id="gradient-focus" x1="0%" y1="0%" x2="100%" y2="100%">
               <stop offset="0%" :stop-color="gradientStart" />
@@ -49,11 +48,11 @@
           </defs>
           <circle 
             class="progress-ring-background" 
-            cx="120" cy="120" r="108"
+            cx="140" cy="140" r="130"
           />
           <circle 
             class="progress-ring-fill" 
-            cx="120" cy="120" r="108"
+            cx="140" cy="140" r="130"
             :stroke="isBreak ? 'url(#gradient-break)' : 'url(#gradient-focus)'"
             :stroke-dasharray="circumference"
             :stroke-dashoffset="progressOffset"
@@ -106,14 +105,12 @@
       <!-- 统计数据 -->
       <div class="stats-panel">
         <div class="stat-item">
-          <div class="stat-icon"></div>
           <div class="stat-content">
             <div class="stat-value">{{ completedSessions }}</div>
             <div class="stat-label">已完成</div>
           </div>
         </div>
         <div class="stat-item">
-          <div class="stat-icon"></div>
           <div class="stat-content">
             <div class="stat-value">{{ formatStatsTime(totalFocusTime) }}</div>
             <div class="stat-label">总专注</div>
@@ -253,7 +250,7 @@ export default {
     },
     
     circumference() {
-      return 2 * Math.PI * 108
+      return 2 * Math.PI * 130  // 更新为130
     },
     
     progressOffset() {
@@ -311,6 +308,7 @@ export default {
         this.startCountdown()
         this.isLoading = false
         this.$emit('timer-started')
+        this.$emit('user-status-change', 'focusing') // 通知状态变为专注
       }, 300)
     },
     
@@ -329,26 +327,31 @@ export default {
       }, 1000)
     },
     
+    // 处理计时器结束的完整逻辑
     handleTimerEnd() {
       if (this.isBreak) {
-        this.startNewSession()
+        this.startFocusSession() // 调用重命名后的方法
       } else {
-        this.startBreak()
+        this.startBreakSession() // 调用重命名后的方法
       }
     },
     
-    startBreak() {
+    // 重命名为避免重复
+    startBreakSession() {
       this.completedSessions++
       this.isBreak = true
       this.timeLeft = this.breakTime
       this.pickRandomEncouragement()
       this.$emit('focus-completed', this.completedSessions)
+      this.$emit('user-status-change', 'resting') // 专注完成进入休息
     },
     
-    startNewSession() {
+    // 重命名为避免重复
+    startFocusSession() {
       this.isBreak = false
       this.timeLeft = this.focusTime
       this.pickRandomEncouragement()
+      this.$emit('user-status-change', 'focusing') // 休息结束开始专注
     },
     
     pauseTimer() {
@@ -363,6 +366,7 @@ export default {
       
       this.startPauseCountdown()
       this.$emit('timer-paused')
+      // 注意：暂停时状态仍然是专注，只是暂停了，所以不改变状态
     },
     
     startPauseCountdown() {
@@ -386,6 +390,7 @@ export default {
       
       this.startCountdown()
       this.$emit('timer-resumed')
+      this.$emit('user-status-change', 'focusing') // 恢复时状态变为专注
     },
     
     stopTimer() {
@@ -393,6 +398,7 @@ export default {
         this.clearTimers()
         this.resetTimer()
         this.$emit('timer-stopped')
+        this.$emit('user-status-change', 'resting') // 终止时状态变为休息
       }
     },
     
@@ -402,8 +408,9 @@ export default {
     
     confirmSkip() {
       this.showSkipConfirm = false
-      this.startNewSession()
+      this.startFocusSession() // 调用重命名后的方法
       this.$emit('break-skipped')
+      this.$emit('user-status-change', 'focusing') // 跳过休息时状态变为专注
     },
     
     cancelSkip() {
@@ -431,20 +438,21 @@ export default {
 </script>
 
 <style scoped>
-/* 基础容器 - 纯白色背景 */
+/* 基础容器 - 修改：移除最大宽度，填满容器 */
 .pomodoro-timer {
   background: #ffffff;
   border-radius: 20px;
-  padding: 28px;
-  max-width: 600px;
-  min-height: 500px;
-  margin: 0 auto;
+  padding: 32px; /* 增大内边距 */
+  width: 100%; /* 填满父容器 */
+  min-height: 550px; /* 增加高度 */
   box-shadow: 
     0 6px 20px rgba(0, 0, 0, 0.06),
     0 1px 4px rgba(0, 0, 0, 0.04);
   border: 1px solid #f0f0f0;
   position: relative;
   overflow: hidden;
+  display: flex; /* flex布局填满高度 */
+  flex-direction: column;
 }
 
 /* 微妙的背景纹理 */
@@ -467,18 +475,22 @@ export default {
 .timer-active-screen {
   position: relative;
   z-index: 1;
+  flex: 1; /* 填满容器高度 */
+  display: flex;
+  flex-direction: column;
 }
 
 /* 初始界面 */
 .timer-start-screen {
   text-align: center;
+  justify-content: center; /* 垂直居中 */
 }
 
 .pomodoro-logo {
-  width: 120px; /* 根据你的logo尺寸调整 */
+  width: 120px;
   height: 120px;
   margin-bottom: 24px;
-  object-fit: contain; /* 保持图片比例 */
+  object-fit: contain;
   animation: float 3s ease-in-out infinite;
   filter: drop-shadow(0 6px 12px rgba(255, 169, 77, 0.25));
 }
@@ -616,11 +628,11 @@ export default {
 .mode-break .mode-dot { background: #63e6be; }
 .mode-pause .mode-dot { background: #ffc078; }
 
-/* 圆形计时器 */
+/* 圆形计时器 - 增大尺寸 */
 .circular-timer {
   position: relative;
-  width: 220px;
-  height: 220px;
+  width: 280px; /* 从220px增大到280px */
+  height: 280px;
   margin: 0 auto 28px;
 }
 
@@ -648,7 +660,7 @@ export default {
 }
 
 .timer-digits {
-  font-size: 44px;
+  font-size: 52px; /* 从44px增大到52px */
   font-weight: 700;
   font-family: 'Inter', system-ui, -apple-system, sans-serif;
   color: hwb(32 47% 4%); 
@@ -665,6 +677,8 @@ export default {
 }
 
 .progress-ring {
+  width: 280px; /* 与容器一致 */
+  height: 280px;
   transform: rotate(-90deg);
 }
 
@@ -679,7 +693,7 @@ export default {
   stroke-width: 10;
   stroke-linecap: round;
   transition: stroke-dashoffset 1s linear;
-  opacity: 0.6; /* 降低不透明度，更清爽 */
+  opacity: 0.6;
 }
 
 /* 鼓励语 */
@@ -689,6 +703,7 @@ export default {
   background: #f8f9fa;
   border-radius: 14px;
   border: 1px solid #e9ecef;
+  flex-shrink: 0; /* 防止被压缩 */
 }
 
 .current-encouragement p {
@@ -707,6 +722,7 @@ export default {
   gap: 10px;
   margin-bottom: 28px;
   flex-wrap: wrap;
+  flex-shrink: 0;
 }
 
 .control-button {
@@ -781,18 +797,17 @@ export default {
   gap: 40px;
   padding-top: 20px;
   border-top: 1px solid #f1f3f5;
-  margin-top: 20px;
+  margin-top: auto; /* 推到容器底部 */
+  flex-shrink: 0;
 }
 
-/* 修改这里：将原来的横向flex改为纵向 */
 .stat-item {
   display: flex;
-  flex-direction: column;  /* 改为纵向排列 */
-  align-items: center;     /* 水平居中 */
-  gap: 8px;                /* 子元素间距 */
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
 }
 
-/* 如果你删除了图标，可以完全简化 */
 .stat-content {
   display: flex;
   flex-direction: column;
@@ -800,15 +815,15 @@ export default {
 }
 
 .stat-value {
-  font-size: 24px;
+  font-size: 28px; /* 从24px增大到28px */
   font-weight: 700;
   color: #212529;
   line-height: 1;
-  margin-bottom: 4px; /* 增加和标签的间距 */
+  margin-bottom: 4px;
 }
 
 .stat-label {
-  font-size: 14px;
+  font-size: 15px; /* 从14px增大到15px */
   color: #868e96;
 }
 
@@ -973,16 +988,615 @@ export default {
 @media (max-width: 768px) {
   .pomodoro-timer {
     padding: 20px;
-    margin: 0 12px;
+    min-height: 500px;
   }
   
   .circular-timer {
-    width: 200px;
-    height: 200px;
+    width: 240px;
+    height: 240px;
+  }
+  
+  .progress-ring {
+    width: 240px;
+    height: 240px;
+  }
+  
+  .progress-ring-background, 
+  .progress-ring-fill {
+    cx: 120;
+    cy: 120;
+    r: 110;
   }
   
   .timer-digits {
-    font-size: 40px;
+    font-size: 44px;
+  }
+  
+  .control-button {
+    min-width: 110px;
+    padding: 10px 16px;
+  }
+  
+  .modal-card {
+    padding: 24px;
+  }
+}
+</style>
+
+<style scoped>
+/* 基础容器 - 修改：移除最大宽度，填满容器 */
+.pomodoro-timer {
+  background: #ffffff;
+  border-radius: 20px;
+  padding: 32px; /* 增大内边距 */
+  width: 100%; /* 填满父容器 */
+  min-height: 550px; /* 增加高度 */
+  box-shadow: 
+    0 6px 20px rgba(0, 0, 0, 0.06),
+    0 1px 4px rgba(0, 0, 0, 0.04);
+  border: 1px solid #f0f0f0;
+  position: relative;
+  overflow: hidden;
+  display: flex; /* flex布局填满高度 */
+  flex-direction: column;
+}
+
+/* 微妙的背景纹理 */
+.pomodoro-timer::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background-image: 
+    radial-gradient(circle at 20% 30%, rgba(255, 169, 77, 0.03) 0%, transparent 50%),
+    radial-gradient(circle at 80% 70%, rgba(255, 135, 135, 0.03) 0%, transparent 50%);
+  pointer-events: none;
+  z-index: 0;
+}
+
+/* 所有内容都在上面 */
+.timer-start-screen,
+.timer-active-screen {
+  position: relative;
+  z-index: 1;
+  flex: 1; /* 填满容器高度 */
+  display: flex;
+  flex-direction: column;
+}
+
+/* 初始界面 */
+.timer-start-screen {
+  text-align: center;
+  justify-content: center; /* 垂直居中 */
+}
+
+.pomodoro-logo {
+  width: 120px;
+  height: 120px;
+  margin-bottom: 24px;
+  object-fit: contain;
+  animation: float 3s ease-in-out infinite;
+  filter: drop-shadow(0 6px 12px rgba(255, 169, 77, 0.25));
+  align-self: center; /* 确保图片自身居中 */
+}
+
+@keyframes float {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-8px); }
+}
+
+.timer-title {
+  font-size: 28px;
+  font-weight: 700;
+  background: linear-gradient(135deg, #ffa94d 0%, #ff8787 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  margin: 0 0 8px 0;
+  letter-spacing: -0.3px;
+}
+
+.timer-subtitle {
+  color: #8a8a8a;
+  font-size: 15px;
+  margin: 0 0 28px 0;
+  font-weight: 400;
+}
+
+.encouragement-card {
+  background: #f8f9fa;
+  border-radius: 16px;
+  padding: 20px;
+  margin: 20px 0 28px;
+  position: relative;
+  border: 1px solid #e9ecef;
+}
+
+.quote-icon {
+  position: absolute;
+  top: 12px;
+  left: 16px;
+  font-size: 20px;
+  color: #ffa94d;
+  opacity: 0.4;
+}
+
+.encouragement-text {
+  color: #495057;
+  font-size: 16px;
+  line-height: 1.6;
+  margin: 0;
+  font-style: italic;
+  font-weight: 500;
+}
+
+.start-button {
+  background: linear-gradient(135deg, #ffa94d 0%, hsl(42, 85%, 61%) 100%);
+  color: white;
+  border: none;
+  padding: 16px 40px;
+  border-radius: 14px;
+  font-size: 16px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  width: 100%;
+  position: relative;
+  overflow: hidden;
+}
+
+.start-button:hover:not(:disabled) {
+  transform: translateY(-2px);
+  box-shadow: 0 8px 20px rgba(255, 169, 77, 0.25);
+}
+
+.start-button:active:not(:disabled) {
+  transform: translateY(0);
+}
+
+.start-button:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.loading-spinner-small {
+  display: inline-block;
+  width: 18px;
+  height: 18px;
+  border: 2px solid rgba(255, 255, 255, 0.3);
+  border-top: 2px solid white;
+  border-radius: 50%;
+  animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+  0% { transform: rotate(0deg); }
+  100% { transform: rotate(360deg); }
+}
+
+/* 激活界面 */
+.timer-active-screen {
+  position: relative;
+}
+
+.mode-indicator {
+  display: inline-flex;
+  align-items: center;
+  padding: 6px 14px;
+  border-radius: 18px;
+  margin-bottom: 20px;
+  font-size: 13px;
+  font-weight: 500;
+  background: #f8f9fa;
+  border: 1px solid #e9ecef;
+}
+
+.mode-indicator.mode-focus {
+  color: #ffa94d;
+}
+
+.mode-indicator.mode-break {
+  color: #63e6be;
+}
+
+.mode-indicator.mode-pause {
+  color: #ffc078;
+}
+
+.mode-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  margin-right: 6px;
+}
+
+.mode-focus .mode-dot { background: #ffa94d; }
+.mode-break .mode-dot { background: #63e6be; }
+.mode-pause .mode-dot { background: #ffc078; }
+
+/* 圆形计时器 - 增大尺寸 */
+.circular-timer {
+  position: relative;
+  width: 280px; /* 从220px增大到280px */
+  height: 280px;
+  margin: 0 auto 28px;
+}
+
+.timer-halo {
+  position: absolute;
+  top: -15px;
+  left: -15px;
+  right: -15px;
+  bottom: -15px;
+  border-radius: 50%;
+  opacity: 0.15;
+  z-index: 0;
+}
+
+.timer-halo.mode-focus { background: #ffa94d; }
+.timer-halo.mode-break { background: #63e6be; }
+
+.timer-display {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  text-align: center;
+  z-index: 2;
+}
+
+.timer-digits {
+  font-size: 52px; /* 从44px增大到52px */
+  font-weight: 700;
+  font-family: 'Inter', system-ui, -apple-system, sans-serif;
+  color: hwb(32 47% 4%); 
+  letter-spacing: -1px;
+  margin-bottom: 4px;
+  text-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
+}
+
+.timer-label {
+  font-size: 14px;
+  color: #868e96;
+  font-weight: 500;
+  letter-spacing: 0.5px;
+}
+
+.progress-ring {
+  width: 280px; /* 与容器一致 */
+  height: 280px;
+  transform: rotate(-90deg);
+}
+
+.progress-ring-background {
+  fill: none;
+  stroke: #f1f3f5;
+  stroke-width: 10;
+}
+
+.progress-ring-fill {
+  fill: none;
+  stroke-width: 10;
+  stroke-linecap: round;
+  transition: stroke-dashoffset 1s linear;
+  opacity: 0.6;
+}
+
+/* 鼓励语 */
+.current-encouragement {
+  margin: 20px 0 28px;
+  padding: 14px;
+  background: #f8f9fa;
+  border-radius: 14px;
+  border: 1px solid #e9ecef;
+  flex-shrink: 0; /* 防止被压缩 */
+}
+
+.current-encouragement p {
+  margin: 0;
+  color: #495057;
+  font-size: 15px;
+  font-weight: 500;
+  text-align: center;
+  line-height: 1.5;
+}
+
+/* 控制按钮 */
+.control-buttons {
+  display: flex;
+  justify-content: center;
+  gap: 10px;
+  margin-bottom: 28px;
+  flex-wrap: wrap;
+  flex-shrink: 0;
+}
+
+.control-button {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 12px 20px;
+  border: 1px solid #e9ecef;
+  border-radius: 10px;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  min-width: 120px;
+  background: white;
+}
+
+.control-button:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+}
+
+.pause-button {
+  background: white;
+  color: #ffa94d;
+  border-color: #ffe8cc;
+}
+
+.pause-button:hover {
+  background: #fff9f2;
+  border-color: #ffa94d;
+}
+
+.resume-button {
+  background: white;
+  color: #63e6be;
+  border-color: #d3f9d8;
+}
+
+.resume-button:hover {
+  background: #f3fef9;
+  border-color: #63e6be;
+}
+
+.stop-button {
+  background: white;
+  color: #ff8787;
+  border-color: #ffd8d8;
+}
+
+.stop-button:hover {
+  background: #fff5f5;
+  border-color: #ff8787;
+}
+
+.skip-button {
+  background: white;
+  color: #9775fa;
+  border-color: #e5dbff;
+}
+
+.skip-button:hover {
+  background: #f8f9ff;
+  border-color: #9775fa;
+}
+
+/* 统计数据 */
+.stats-panel {
+  display: flex;
+  justify-content: center;
+  gap: 40px;
+  padding-top: 20px;
+  border-top: 1px solid #f1f3f5;
+  margin-top: auto; /* 推到容器底部 */
+  flex-shrink: 0;
+}
+
+.stat-item {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+}
+
+.stat-content {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+.stat-value {
+  font-size: 28px; /* 从24px增大到28px */
+  font-weight: 700;
+  color: #212529;
+  line-height: 1;
+  margin-bottom: 4px;
+}
+
+.stat-label {
+  font-size: 15px; /* 从14px增大到15px */
+  color: #868e96;
+}
+
+/* 模态框 */
+.modal-container {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.4);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+  backdrop-filter: blur(3px);
+  animation: fadeIn 0.2s ease;
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+.modal-card {
+  background: white;
+  border-radius: 20px;
+  padding: 28px;
+  max-width: 380px;
+  width: 90%;
+  box-shadow: 0 16px 40px rgba(0, 0, 0, 0.12);
+  animation: slideUp 0.3s ease;
+  border: 1px solid #f0f0f0;
+}
+
+@keyframes slideUp {
+  from { 
+    opacity: 0;
+    transform: translateY(15px);
+  }
+  to { 
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.modal-header {
+  text-align: center;
+  margin-bottom: 20px;
+}
+
+.modal-icon {
+  font-size: 40px;
+  margin-bottom: 12px;
+}
+
+.modal-title {
+  font-size: 20px;
+  font-weight: 700;
+  color: #212529;
+  margin: 0;
+}
+
+.modal-body {
+  margin-bottom: 20px;
+}
+
+.modal-message {
+  color: #495057;
+  font-size: 15px;
+  line-height: 1.6;
+  margin: 0 0 12px 0;
+  text-align: center;
+}
+
+.modal-tip {
+  color: #868e96;
+  font-size: 13px;
+  text-align: center;
+  margin: 0;
+  font-style: italic;
+}
+
+.pause-timer {
+  background: #f8f9fa;
+  border-radius: 10px;
+  padding: 14px;
+  margin-top: 12px;
+  position: relative;
+  overflow: hidden;
+  border: 1px solid #e9ecef;
+}
+
+.pause-progress {
+  position: absolute;
+  top: 0;
+  left: 0;
+  bottom: 0;
+  background: linear-gradient(90deg, #ffc078 0%, #ffd8a8 100%);
+  transition: width 1s linear;
+  opacity: 0.7;
+}
+
+.pause-time {
+  position: relative;
+  z-index: 1;
+  text-align: center;
+  font-size: 18px;
+  font-weight: 600;
+  color: #212529;
+}
+
+.modal-action-button, .modal-button {
+  width: 100%;
+  padding: 14px;
+  border: none;
+  border-radius: 10px;
+  font-size: 15px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.3s ease;
+}
+
+.modal-action-button {
+  background: linear-gradient(135deg, #ffa94d 0%, #ff8787 100%);
+  color: white;
+}
+
+.modal-action-button:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(255, 169, 77, 0.25);
+}
+
+.modal-actions {
+  display: flex;
+  gap: 10px;
+  margin-top: 12px;
+}
+
+.modal-button {
+  flex: 1;
+}
+
+.confirm-button {
+  background: linear-gradient(135deg, #63e6be 0%, #96f2d7 100%);
+  color: white;
+  border: none;
+}
+
+.cancel-button {
+  background: white;
+  color: #495057;
+  border: 1px solid #dee2e6;
+}
+
+.confirm-button:hover, .cancel-button:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+}
+
+/* 响应式设计 */
+@media (max-width: 768px) {
+  .pomodoro-timer {
+    padding: 20px;
+    min-height: 500px;
+  }
+  
+  .circular-timer {
+    width: 240px;
+    height: 240px;
+  }
+  
+  .progress-ring {
+    width: 240px;
+    height: 240px;
+  }
+  
+  .progress-ring-background, 
+  .progress-ring-fill {
+    cx: 120;
+    cy: 120;
+    r: 110;
+  }
+  
+  .timer-digits {
+    font-size: 44px;
   }
   
   .control-button {
