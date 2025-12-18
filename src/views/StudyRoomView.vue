@@ -223,7 +223,7 @@ export default {
     await this.validateAndLoadRoom()
     this.startMembersAutoRefresh()
   },
-  watch: {
+    watch: {
     '$route.params.roomId': {
       handler(newRoomId) {
         if (newRoomId) {
@@ -233,22 +233,38 @@ export default {
     },
     'userStatus.isFocusing'(newVal, oldVal) {
       if (newVal !== oldVal) {
-        // 先本地同步右侧成员列表状态
+        // 状态变化时，确保本地成员列表同步
         this.updateMemberStatusLocally(newVal ? 'focusing' : 'resting')
         this.statusChanged = true
-        this.updateUserStatusToServer()
+        // updateUserStatusToServer 会在 syncLocalStatus 中调用，这里不需要重复调用
       }
     }
   },
   methods: {
     syncLocalStatus(status) {
       const isFocus = status === 'focusing'
+      const wasFocusing = this.userStatus.isFocusing
+      
       this.hasStartedFocus = isFocus
-      // 同步“我的状态”展示
+      // 同步"我的状态"展示
       this.userStatus.isFocusing = isFocus
+      
+      // 如果开始专注，记录开始时间并启动计时器
+      if (isFocus && !wasFocusing) {
+        this.userStatus.focusStartTime = Date.now()
+        this.startFocusTimer()
+      } else if (!isFocus && wasFocusing) {
+        // 如果停止专注，停止计时器
+        this.stopFocusTimer()
+      }
+      
       // 同步右侧成员列表
       this.updateMemberStatusLocally(status)
-      // 仅有成员列表接口时，主动拉取一次以获取后端状态
+      
+      // 同步到服务器
+      this.updateUserStatusToServer()
+      
+      // 主动拉取一次以获取后端状态（确保其他用户能看到更新）
       this.loadMembersData().catch(err => console.error('刷新成员列表失败:', err))
     },
 
@@ -310,15 +326,20 @@ export default {
             console.log('房间数据加载完成')
           } else {
             console.log('房间数据为空，视为不存在')
-            this.roomNotFound = true
+            this.handleRoomDisbanded()
           }
         } else {
           console.log('房间验证失败')
-          this.roomNotFound = true
+          this.handleRoomDisbanded()
         }
       } catch (error) {
         console.error('验证房间时出错:', error)
-        this.roomNotFound = true
+        // 检查是否是404错误（房间不存在/已被解散）
+        if (error.status === 404 || error.message?.includes('404') || error.message?.includes('不存在')) {
+          this.handleRoomDisbanded()
+        } else {
+          this.roomNotFound = true
+        }
       } finally {
         this.loading = false
         this.lastRefreshTime = Date.now()
@@ -338,6 +359,14 @@ export default {
           : Array.isArray(data?.content) ? data.content
           : Array.isArray(data) ? data
           : []
+
+        // 检查响应是否表示房间不存在
+        if (response.code === 404 || response.status === 404 || 
+            (response.success === false && (response.message?.includes('不存在') || response.message?.includes('已解散')))) {
+          console.log('检测到房间已被解散')
+          this.handleRoomDisbanded()
+          return
+        }
 
         if ((response.code === 200 || response.success === true) && list.length) {
           const currentIdStr = this.normalizedCurrentUserId
@@ -398,12 +427,29 @@ export default {
           // 更新当前用户状态
           const currentMember = this.members.find(m => m.isCurrentUser)
           if (currentMember) {
-            this.userStatus.isFocusing = currentMember.status === 'focusing'
+            const serverStatus = currentMember.status === 'focusing'
+            // 如果服务器状态与本地状态不一致，且本地已经开始了专注，以本地为准
+            if (this.hasStartedFocus && this.userStatus.isFocusing !== serverStatus) {
+              console.log('服务器状态与本地不一致，以本地状态为准:', {
+                本地: this.userStatus.isFocusing ? 'focusing' : 'resting',
+                服务器: serverStatus ? 'focusing' : 'resting'
+              })
+              // 同步本地状态到服务器
+              this.updateUserStatusToServer()
+            } else {
+              // 否则以服务器状态为准（适用于刚进入房间时）
+              this.userStatus.isFocusing = serverStatus
+              if (serverStatus && !this.userStatus.focusStartTime) {
+                this.userStatus.focusStartTime = Date.now()
+                this.startFocusTimer()
+              }
+            }
             console.log('当前用户信息:', {
               id: currentMember.id,
               name: currentMember.name,
               role: currentMember.role,
-              isCurrentUser: currentMember.isCurrentUser
+              isCurrentUser: currentMember.isCurrentUser,
+              status: currentMember.status
             })
           } else {
             console.warn('⚠️ 当前用户不在成员列表中')
@@ -424,6 +470,12 @@ export default {
         }
       } catch (error) {
         console.error('加载成员数据失败:', error)
+        // 检查是否是404错误（房间不存在/已被解散）
+        if (error.status === 404 || error.message?.includes('404') || error.message?.includes('不存在') || error.message?.includes('已解散')) {
+          console.log('检测到房间已被解散（从错误中）')
+          this.handleRoomDisbanded()
+          return
+        }
         this.setTempMembersData()
         // 即使失败，也检查一下
         this.checkIfRoomOwner()
@@ -526,9 +578,32 @@ export default {
       return currentMember.role || '无角色'
     },
 
-    // 保留方法避免 eslint 未使用报错；实际逻辑在 syncLocalStatus 中
-    updateUserStatusToServer() {
-      this.statusChanged = false
+    // 同步用户状态到服务器
+    async updateUserStatusToServer() {
+      if (!this.roomId || !this.currentUserId) {
+        console.warn('无法更新状态：缺少房间ID或用户ID')
+        return
+      }
+
+      const status = this.userStatus.isFocusing ? 'focusing' : 'resting'
+      const statusData = {
+        userId: this.currentUserId,
+        status: status,
+        isFocusing: this.userStatus.isFocusing,
+        focusStartTime: this.userStatus.isFocusing && this.userStatus.focusStartTime 
+          ? new Date(this.userStatus.focusStartTime).toISOString() 
+          : null
+      }
+
+      try {
+        console.log('同步用户状态到服务器:', statusData)
+        const response = await updateUserStatus(this.roomId, statusData)
+        console.log('状态同步响应:', response)
+        this.statusChanged = false
+      } catch (error) {
+        console.error('同步用户状态失败:', error)
+        // 即使同步失败，也继续更新本地状态，保证用户体验
+      }
     },
 
     startFocusTimer() {
@@ -566,33 +641,43 @@ export default {
 
     // 番茄钟事件
     handleTimerStart() {
-      console.log('番茄钟开始')
+      console.log('番茄钟开始 - 切换到专注状态')
       this.syncLocalStatus('focusing')
     },
     
     handleTimerPause() {
-      console.log('番茄钟暂停')
-      // 仍视为专注态，不切换状态
+      console.log('番茄钟暂停 - 保持专注状态')
+      // 暂停时仍视为专注态，不切换状态
+      // 但可以更新一下服务器状态，确保状态一致
+      if (this.userStatus.isFocusing) {
+        this.updateUserStatusToServer()
+      }
     },
     
     handleTimerResume() {
-      console.log('番茄钟继续')
-      this.syncLocalStatus('focusing')
+      console.log('番茄钟继续 - 保持专注状态')
+      // 继续时确保状态为专注
+      if (!this.userStatus.isFocusing) {
+        this.syncLocalStatus('focusing')
+      } else {
+        // 如果已经是专注状态，只更新服务器
+        this.updateUserStatusToServer()
+      }
     },
     
     handleTimerStop() {
-      console.log('番茄钟停止')
+      console.log('番茄钟停止 - 切换到休息状态')
       this.syncLocalStatus('resting')
     },
     
     handleFocusCompleted(sessions) {
-      console.log(`专注完成，已完成 ${sessions} 个番茄`)
-      // 进入休息
+      console.log(`专注完成，已完成 ${sessions} 个番茄 - 进入休息状态`)
+      // 专注完成，进入休息
       this.syncLocalStatus('resting')
     },
     
     handleBreakSkipped() {
-      console.log('休息被跳过')
+      console.log('休息被跳过 - 切换到专注状态')
       this.syncLocalStatus('focusing')
     },
 
@@ -659,10 +744,7 @@ export default {
       
       try {
         // 清理定时器
-        if (this.refreshTimer) {
-          clearInterval(this.refreshTimer)
-          this.refreshTimer = null
-        }
+        this.stopMembersAutoRefresh()
         if (this.focusTimer) {
           clearInterval(this.focusTimer)
           this.focusTimer = null
@@ -761,6 +843,10 @@ export default {
 
       try {
         this.loading = true
+        
+        // 停止自动刷新，避免在解散过程中继续刷新
+        this.stopMembersAutoRefresh()
+        
         console.log('开始解散房间...')
         console.log('房间ID:', this.roomId)
         console.log('用户ID:', this.currentUserId)
@@ -808,8 +894,43 @@ export default {
         clearInterval(this.refreshTimer)
       }
       this.refreshTimer = setInterval(() => {
+        // 如果房间已不存在，停止刷新
+        if (this.roomNotFound) {
+          this.stopMembersAutoRefresh()
+          return
+        }
         this.loadMembersData()
       }, this.refreshInterval)
+    },
+
+    stopMembersAutoRefresh() {
+      if (this.refreshTimer) {
+        clearInterval(this.refreshTimer)
+        this.refreshTimer = null
+      }
+    },
+
+    // 处理房间被解散的情况
+    handleRoomDisbanded() {
+      console.log('房间已被解散，准备跳转')
+      
+      // 停止所有定时器
+      this.stopMembersAutoRefresh()
+      if (this.focusTimer) {
+        clearInterval(this.focusTimer)
+        this.focusTimer = null
+      }
+      
+      // 设置房间不存在标志
+      this.roomNotFound = true
+      
+      // 显示提示信息
+      alert('⚠️ 自习室已被房主解散\n\n所有成员已被移出，即将返回首页')
+      
+      // 延迟跳转，让用户看到提示
+      setTimeout(() => {
+        this.goToHome()
+      }, 500)
     },
 
     updateMemberStatusLocally(status) {
@@ -854,11 +975,11 @@ export default {
     }
   },
   beforeUnmount() {
+    // 清理所有定时器
+    this.stopMembersAutoRefresh()
     if (this.focusTimer) {
       clearInterval(this.focusTimer)
-    }
-    if (this.refreshTimer) {
-      clearInterval(this.refreshTimer)
+      this.focusTimer = null
     }
   }
 }

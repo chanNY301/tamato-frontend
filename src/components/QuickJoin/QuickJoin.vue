@@ -255,13 +255,25 @@ export default {
       const roomName = room.roomName || room.room_name || room.name || '自习室'
       const maxMembers = Math.max(room.maxMembers || room.max_members || room.max_member || 4, 1)
       
-      let currentMembers = room.currentMembers || room.current_members || room.current_member || 0
-      currentMembers = Math.min(Math.max(currentMembers, 0), maxMembers)
+      // 从API返回的数据中读取现有人数，支持多种字段名
+      // 后端可能返回活跃成员数（状态为'专注中'或'休息中'的成员）
+      // 优先使用：activeMemberCount, active_member_count, countActiveMembers, count_active_members
+      // 其次使用：currentMembers, current_members, current_member, memberCount, member_count
+      let currentMembers = room.activeMemberCount || 
+                          room.active_member_count ||
+                          room.countActiveMembers ||
+                          room.count_active_members ||
+                          room.currentMembers || 
+                          room.current_members || 
+                          room.current_member || 
+                          room.memberCount || 
+                          room.member_count ||
+                          room.activeMembers ||
+                          room.active_members ||
+                          0
       
-      // 随机生成在线人数（为了显示效果）
-      if (currentMembers === 0 && Math.random() > 0.3) {
-        currentMembers = Math.floor(Math.random() * maxMembers) + 1
-      }
+      // 确保人数在合理范围内（0 到 maxMembers）
+      currentMembers = Math.min(Math.max(Number(currentMembers) || 0, 0), maxMembers)
       
       // 支持 endTime (时间戳毫秒) 和 end_time (时间戳秒) 两种格式
       const endTime = room.endTime || room.end_time
@@ -272,7 +284,7 @@ export default {
         room_name: roomName,
         create_person: room.createPerson || room.create_person || room.creator || room.owner || '未知用户',
         max_members: maxMembers,
-        current_members: currentMembers,
+        current_members: currentMembers, // 使用真实的人数，不再随机生成
         music_name: room.musicName || room.music_name || room.music || '无背景音乐',
         is_active: isActive
       }
@@ -344,6 +356,83 @@ export default {
         clearInterval(this.refreshTimer)
         this.refreshTimer = null
       }
+    },
+
+    // 异步更新房间的成员数（如果API没有返回或需要验证）
+    async updateRoomMemberCounts() {
+      // 检查哪些房间需要更新成员数
+      // 注意：后端统计的是状态为'专注中'或'休息中'的活跃成员
+      // 如果现有人数为0，可能是：
+      // 1. API没有返回真实数据
+      // 2. 房间确实没有活跃成员（但创建者刚加入可能还没开始专注）
+      const roomsToUpdate = this.allRooms.filter(room => {
+        // 如果现有人数为0，可能需要更新（但创建者可能在房间里但还没开始专注）
+        // 为了确保准确性，我们仍然尝试获取一次真实数据
+        return room.current_members === 0 || room.current_members === undefined || room.current_members === null
+      })
+
+      if (roomsToUpdate.length === 0) {
+        console.log('✅ 所有房间都有现有人数，无需更新')
+        return
+      }
+
+      console.log(`🔄 需要更新 ${roomsToUpdate.length} 个房间的成员数（现有人数为0或未返回）`)
+      console.log('📝 注意：后端统计的是状态为"专注中"或"休息中"的活跃成员数')
+
+      // 并行获取所有房间的成员数（限制并发数，避免过多请求）
+      const BATCH_SIZE = 5 // 每批处理5个房间
+      for (let i = 0; i < roomsToUpdate.length; i += BATCH_SIZE) {
+        const batch = roomsToUpdate.slice(i, i + BATCH_SIZE)
+        const promises = batch.map(async (room) => {
+          try {
+            const response = await getRoomMembers(room.room_id, null)
+            console.log(`📊 房间 ${room.room_id} 的成员列表响应:`, response)
+
+            // 解析成员列表
+            // 注意：后端返回的成员列表可能只包含状态为'专注中'或'休息中'的活跃成员
+            const data = response?.data
+            const memberList = Array.isArray(data?.list) ? data.list
+              : Array.isArray(data?.members) ? data.members
+              : Array.isArray(data?.content) ? data.content
+              : Array.isArray(data) ? data
+              : []
+
+            // 统计活跃成员数（状态为'专注中'或'休息中'的成员）
+            // 如果后端只返回活跃成员，memberList.length 就是活跃成员数
+            const activeMemberCount = memberList.length
+            
+            // 如果API返回了总成员数，优先使用
+            const totalMemberCount = data?.totalMembers || data?.total_members || data?.memberCount || data?.member_count
+            
+            // 使用总成员数（如果存在），否则使用活跃成员数
+            const memberCount = totalMemberCount !== undefined ? totalMemberCount : activeMemberCount
+            
+            console.log(`✅ 房间 ${room.room_id} 的成员数: ${memberCount} (活跃成员: ${activeMemberCount}${totalMemberCount ? `, 总成员: ${totalMemberCount}` : ''})`)
+
+            // 更新房间的成员数
+            const roomIndex = this.allRooms.findIndex(r => r.room_id === room.room_id)
+            if (roomIndex !== -1) {
+              // Vue 3 中不需要 $set，直接赋值即可
+              this.allRooms[roomIndex].current_members = memberCount
+              // 如果当前页显示了这个房间，也需要更新显示
+              this.updateDisplayedRooms()
+            }
+          } catch (error) {
+            console.error(`❌ 获取房间 ${room.room_id} 的成员数失败:`, error)
+            // 失败时保持原值，不做处理
+          }
+        })
+
+        // 等待当前批次完成
+        await Promise.all(promises)
+        
+        // 批次之间稍作延迟，避免请求过于密集
+        if (i + BATCH_SIZE < roomsToUpdate.length) {
+          await new Promise(resolve => setTimeout(resolve, 100))
+        }
+      }
+
+      console.log('✅ 房间成员数更新完成')
     }
   }
 }
