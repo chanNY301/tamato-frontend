@@ -349,6 +349,8 @@ export default {
       this.isBreak = false
       this.timeLeft = this.focusTime
       this.pickRandomEncouragement()
+      // 休息结束，自动开始新的专注
+      this.$emit('timer-started')
     },
     
     pauseTimer() {

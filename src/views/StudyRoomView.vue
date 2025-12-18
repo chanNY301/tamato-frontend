@@ -159,7 +159,7 @@
 </template>
 
 <script>
-import { getRoomDetail, leaveRoom, getRoomMembers, deleteRoom } from '@/api/studyRooms'
+import { getRoomDetail, leaveRoom, getRoomMembers, deleteRoom, updateUserStatus } from '@/api/studyRooms'
 import PomodoroTimer from '@/components/PomodoroTimer/PomodoroTimer.vue'
 import { getCurrentUser } from '@/api/user'
 

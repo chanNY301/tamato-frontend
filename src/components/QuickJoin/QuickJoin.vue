@@ -92,7 +92,7 @@
 </template>
 
 <script>
-import { getRoomsList } from '@/api/studyRooms'
+import { getRoomsList, getRoomMembers } from '@/api/studyRooms'
 
 export default {
   name: 'QuickJoin',
@@ -161,13 +161,14 @@ export default {
         
         if (roomList && roomList.length > 0) {
           console.log(`✅ 获取到 ${roomList.length} 个自习室`)
+          console.log('📊 原始房间数据示例（第一个）:', roomList[0])
           
           // 处理所有房间数据
           this.allRooms = roomList
             .filter(room => room)
             .map(room => this.formatRoomData(room))
           
-          console.log('📋 所有房间数据:', this.allRooms)
+          console.log('📋 格式化后的房间数据:', this.allRooms)
           
           // 计算实际的总页数
           this.calculateTotalPages()
@@ -176,6 +177,9 @@ export default {
           this.updateDisplayedRooms()
           
           console.log(`🎯 总房间数: ${this.allRooms.length}, 每页: ${this.roomsPerPage}, 总页数: ${this.totalPages}`)
+          
+          // 异步获取每个房间的真实成员数（如果API没有返回）
+          this.updateRoomMemberCounts()
         } else {
           console.warn('⚠️ API返回数据格式异常或数据为空', response)
           this.allRooms = []
