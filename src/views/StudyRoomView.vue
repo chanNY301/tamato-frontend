@@ -355,36 +355,6 @@ export default {
       );
     },
 
-    // 番茄钟事件处理（简化）
-    handleTimerStart() {
-      console.log("番茄钟开始");
-      // 这个事件已经被 handleUserStatusChange 处理了
-    },
-
-    handleTimerPause() {
-      console.log("番茄钟暂停");
-      // 暂停时状态不变，还是专注
-    },
-
-    handleTimerResume() {
-      console.log("番茄钟继续");
-      // 这个事件已经被 handleUserStatusChange 处理了
-    },
-
-    handleTimerStop() {
-      console.log("番茄钟停止");
-      // 这个事件已经被 handleUserStatusChange 处理了
-    },
-
-    handleFocusCompleted(sessions) {
-      console.log(`专注完成，已完成 ${sessions} 个番茄`);
-      // 这个事件已经被 handleUserStatusChange 处理了
-    },
-
-    handleBreakSkipped() {
-      console.log("休息被跳过");
-      // 这个事件已经被 handleUserStatusChange 处理了
-    },
 
     // 加载当前用户信息
     async loadCurrentUser() {
