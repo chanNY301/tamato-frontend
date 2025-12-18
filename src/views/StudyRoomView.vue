@@ -5,21 +5,15 @@
       <div class="nav-brand">Tomato</div>
       <div class="nav-links">
         <!-- 房主显示解散按钮，普通成员显示退出按钮 -->
-        <button 
-          v-if="isRoomOwner" 
-          @click="disbandRoom" 
+        <button
+          v-if="isRoomOwner"
+          @click="disbandRoom"
           class="nav-link disband-nav-btn"
           title="解散自习室（房主专用）"
         >
-          🗑️ 解散自习室
+          解散自习室
         </button>
-        <button 
-          v-else 
-          @click="leaveRoom" 
-          class="nav-link"
-        >
-          退出房间
-        </button>
+        <button v-else @click="leaveRoom" class="nav-link">退出房间</button>
         <button @click="goToHome" class="nav-link">返回首页</button>
       </div>
     </nav>
@@ -41,8 +35,12 @@
             房间ID <strong>{{ roomId }}</strong> 不存在或已关闭
           </p>
           <div class="not-found-actions">
-            <button @click="goToHome" class="action-btn primary-btn">返回首页</button>
-            <button @click="goToJoinRoom" class="action-btn secondary-btn">加入其他自习室</button>
+            <button @click="goToHome" class="action-btn primary-btn">
+              返回首页
+            </button>
+            <button @click="goToJoinRoom" class="action-btn secondary-btn">
+              加入其他自习室
+            </button>
           </div>
         </div>
       </div>
@@ -52,23 +50,43 @@
         <!-- 房间头部信息 -->
         <div class="room-header">
           <div class="room-title-section">
-            <h1 class="room-title">{{ roomInfo.room_name || '未命名自习室' }}</h1>
+            <h1 class="room-title">
+              {{ roomInfo.room_name || "未命名自习室" }}
+            </h1>
             <div class="room-meta">
-              <span class="meta-item">房间ID: {{ roomInfo.room_id || roomId }}</span>
-              <span class="meta-item">创建者: {{ roomInfo.create_person || '未知' }}</span>
-              <span class="meta-item">最大人数: {{ roomInfo.max_members || 4 }}</span>
+              <span class="meta-item"
+                >房间ID: {{ roomInfo.room_id || roomId }}</span
+              >
+              <span class="meta-item"
+                >创建者: {{ roomInfo.create_person || "未知" }}</span
+              >
+              <span class="meta-item"
+                >最大人数: {{ roomInfo.max_members || 4 }}</span
+              >
               <!-- 调试信息：显示房主状态 -->
-              <span v-if="!isRoomOwner && members.length > 0" class="meta-item debug-info" style="color: #999; font-size: 0.85em;">
+              <span
+                v-if="!isRoomOwner && members.length > 0"
+                class="meta-item debug-info"
+                style="color: #999; font-size: 0.85em"
+              >
                 调试: 当前用户角色 = {{ getCurrentUserRole() }}
               </span>
             </div>
           </div>
           <div class="room-actions">
-            <button v-if="isRoomOwner" @click="disbandRoom" class="action-btn disband-btn">
+            <button
+              v-if="isRoomOwner"
+              @click="disbandRoom"
+              class="action-btn disband-btn"
+            >
               <span class="btn-icon">🗑️</span>
               <span class="btn-text">解散自习室</span>
             </button>
-            <button v-if="isRoomOwner" @click="showRoomSettings" class="action-btn settings-btn">
+            <button
+              v-if="isRoomOwner"
+              @click="showRoomSettings"
+              class="action-btn settings-btn"
+            >
               <span class="btn-icon">⚙️</span>
               <span class="btn-text">房间设置</span>
             </button>
@@ -78,24 +96,27 @@
         <div class="room-layout">
           <!-- 左侧：番茄钟和工作区 -->
           <div class="left-section">
-            <div class="timer-section">
-              <PomodoroTimer
-                :key="roomId"
-                @timer-started="handleTimerStart"
-                @timer-paused="handleTimerPause"
-                @timer-resumed="handleTimerResume"
-                @timer-stopped="handleTimerStop"
-                @focus-completed="handleFocusCompleted"
-                @break-skipped="handleBreakSkipped"
-              />
-            </div>
+            <PomodoroTimer
+              class="timer-component"
+              :key="roomId"
+              @timer-started="handleTimerStart"
+              @timer-paused="handleTimerPause"
+              @timer-resumed="handleTimerResume"
+              @timer-stopped="handleTimerStop"
+              @focus-completed="handleFocusCompleted"
+              @break-skipped="handleBreakSkipped"
+              @user-status-change="handleUserStatusChange"
+            />
 
             <!-- 用户状态控制 -->
             <div class="user-status-section">
               <h3>我的状态</h3>
-              <div class="status-display" :class="userStatus.isFocusing ? 'focusing' : 'resting'">
+              <div
+                class="status-display"
+                :class="userStatus.isFocusing ? 'focusing' : 'resting'"
+              >
                 <span class="status-label">
-                  {{ userStatus.isFocusing ? '🎯 专注中' : '☕ 休息中' }}
+                  {{ userStatus.isFocusing ? "🎯 专注中" : "☕ 休息中" }}
                 </span>
                 <span class="status-tip">状态会随番茄钟开始/停止自动同步</span>
               </div>
@@ -112,30 +133,54 @@
           <div class="right-section">
             <div class="members-section">
               <div class="section-header">
-                <h3>成员列表 ({{ members.length }}/{{ roomInfo.max_members || 4 }})</h3>
+                <h3>
+                  成员列表 ({{ members.length }}/{{
+                    roomInfo.max_members || 4
+                  }})
+                </h3>
                 <div class="stats">
-                  <span class="stat focusing">专注: {{ focusingMembers.length }}</span>
-                  <span class="stat resting">休息: {{ restingMembers.length }}</span>
+                  <span class="stat focusing"
+                    >专注: {{ focusingMembers.length }}</span
+                  >
+                  <span class="stat resting"
+                    >休息: {{ restingMembers.length }}</span
+                  >
                 </div>
               </div>
 
               <div class="members-list">
-                <div v-for="member in members" :key="member.id" class="member-card">
+                <div
+                  v-for="member in members"
+                  :key="member.id"
+                  class="member-card"
+                >
                   <div class="member-avatar">
                     {{ getInitials(member.name) }}
                   </div>
                   <div class="member-info">
                     <div class="member-name">
                       {{ member.name }}
-                      <span v-if="member.isCurrentUser" class="current-user-tag">(我)</span>
-                      <span v-if="member.role === 'host'" class="host-tag">房主</span>
+                      <span v-if="member.isCurrentUser" class="current-user-tag"
+                        >(我)</span
+                      >
+                      <span v-if="member.role === 'host'" class="host-tag"
+                        >房主</span
+                      >
                     </div>
                     <div class="member-status">
                       <span :class="['status-tag', member.status]">
-                        {{ member.status === 'focusing' ? '🎯 专注中' : '☕ 休息中' }}
+                        {{
+                          member.status === "focusing"
+                            ? "🎯 专注中"
+                            : "☕ 休息中"
+                        }}
                       </span>
                       <span class="time-info">
-                        {{ member.status === 'focusing' ? member.focusTime : member.restTime }}
+                        {{
+                          member.status === "focusing"
+                            ? member.focusTime
+                            : member.restTime
+                        }}
                       </span>
                     </div>
                   </div>
@@ -159,30 +204,36 @@
 </template>
 
 <script>
-import { getRoomDetail, leaveRoom, getRoomMembers, deleteRoom, updateUserStatus } from '@/api/studyRooms'
-import PomodoroTimer from '@/components/PomodoroTimer/PomodoroTimer.vue'
-import { getCurrentUser } from '@/api/user'
+import {
+  getRoomDetail,
+  leaveRoom,
+  getRoomMembers,
+  deleteRoom,
+  updateUserStatus,
+} from "@/api/studyRooms";
+import PomodoroTimer from "@/components/PomodoroTimer/PomodoroTimer.vue";
+import { getCurrentUser } from "@/api/user";
 
 export default {
-  name: 'StudyRoomView',
+  name: "StudyRoomView",
   components: {
-    PomodoroTimer
+    PomodoroTimer,
   },
   data() {
     return {
       roomInfo: {
-        room_id: '',
-        room_name: '',
-        create_person: '',
+        room_id: "",
+        room_name: "",
+        create_person: "",
         max_members: 0,
         current_time: 0,
         end_time: 0,
-        music_name: ''
+        music_name: "",
       },
       userStatus: {
         isFocusing: false,
-        focusTime: '00:00:00',
-        focusStartTime: null
+        focusTime: "00:00:00",
+        focusStartTime: null,
       },
       hasStartedFocus: false,
       members: [],
@@ -195,290 +246,428 @@ export default {
       focusTimer: null,
       lastRefreshTime: null,
       refreshTimer: null,
-      refreshInterval: 5000
-    }
+      refreshInterval: 5000,
+    };
   },
   computed: {
     roomId() {
-      return this.$route.params.roomId
+      return this.$route.params.roomId;
     },
     focusingMembers() {
-      return this.members.filter(member => member.status === 'focusing')
+      return this.members.filter((member) => member.status === "focusing");
     },
     restingMembers() {
-      return this.members.filter(member => member.status === 'resting')
+      return this.members.filter((member) => member.status === "resting");
     },
     currentUserId() {
-      if (!this.currentUser) return null
-      return this.currentUser.id || this.currentUser.userId || this.currentUser.user_id
+      if (!this.currentUser) return null;
+      return (
+        this.currentUser.id ||
+        this.currentUser.userId ||
+        this.currentUser.user_id
+      );
     },
     normalizedCurrentUserId() {
-      if (!this.currentUserId && this.currentUserId !== 0) return null
-      return String(this.currentUserId)
-    }
+      if (!this.currentUserId && this.currentUserId !== 0) return null;
+      return String(this.currentUserId);
+    },
   },
   async mounted() {
     // 先获取用户信息，再加载房间数据
-    await this.loadCurrentUser()
-    await this.validateAndLoadRoom()
-    this.startMembersAutoRefresh()
+    await this.loadCurrentUser();
+    await this.validateAndLoadRoom();
+    this.startMembersAutoRefresh();
   },
-    watch: {
-    '$route.params.roomId': {
+  watch: {
+    "$route.params.roomId": {
       handler(newRoomId) {
         if (newRoomId) {
-          this.validateAndLoadRoom()
+          this.validateAndLoadRoom();
         }
-      }
+      },
     },
-    'userStatus.isFocusing'(newVal, oldVal) {
+    "userStatus.isFocusing"(newVal, oldVal) {
       if (newVal !== oldVal) {
         // 状态变化时，确保本地成员列表同步
-        this.updateMemberStatusLocally(newVal ? 'focusing' : 'resting')
-        this.statusChanged = true
+        this.updateMemberStatusLocally(newVal ? "focusing" : "resting");
+        this.statusChanged = true;
         // updateUserStatusToServer 会在 syncLocalStatus 中调用，这里不需要重复调用
       }
-    }
+    },
   },
   methods: {
+    // 处理用户状态变化（新方法）
+    handleUserStatusChange(status) {
+      console.log("番茄钟状态变化:", status);
+      this.syncLocalStatus(status);
+
+      // 同步到后端服务器（这里需要调用你的API）
+      this.syncStatusToServer(status);
+    },
+
+    // 同步状态到服务器
+    async syncStatusToServer(status) {
+      try {
+        // 这里需要调用你的后端API来更新用户状态
+        // 示例：await updateUserStatus(this.roomId, this.currentUserId, status)
+        console.log("正在同步状态到服务器:", {
+          roomId: this.roomId,
+          userId: this.currentUserId,
+          status: status,
+        });
+
+        // 临时模拟：更新当前用户的专注开始时间
+        if (status === "focusing") {
+          this.userStatus.focusStartTime = Date.now();
+        }
+      } catch (error) {
+        console.error("同步状态到服务器失败:", error);
+      }
+    },
+
+    // 修改 syncLocalStatus 方法
     syncLocalStatus(status) {
-      const isFocus = status === 'focusing'
-      const wasFocusing = this.userStatus.isFocusing
-      
-      this.hasStartedFocus = isFocus
+      const isFocus = status === "focusing";
+      const wasFocusing = this.userStatus.isFocusing;
+
+      this.hasStartedFocus = isFocus;
       // 同步"我的状态"展示
-      this.userStatus.isFocusing = isFocus
-      
+      this.userStatus.isFocusing = isFocus;
+
       // 如果开始专注，记录开始时间并启动计时器
       if (isFocus && !wasFocusing) {
-        this.userStatus.focusStartTime = Date.now()
-        this.startFocusTimer()
+        this.userStatus.focusStartTime = Date.now();
+        this.startFocusTimer();
       } else if (!isFocus && wasFocusing) {
         // 如果停止专注，停止计时器
-        this.stopFocusTimer()
+        this.stopFocusTimer();
       }
-      
+
       // 同步右侧成员列表
-      this.updateMemberStatusLocally(status)
-      
+      this.updateMemberStatusLocally(status);
+
       // 同步到服务器
-      this.updateUserStatusToServer()
-      
+      this.updateUserStatusToServer();
+
       // 主动拉取一次以获取后端状态（确保其他用户能看到更新）
-      this.loadMembersData().catch(err => console.error('刷新成员列表失败:', err))
+      this.loadMembersData().catch((err) =>
+        console.error("刷新成员列表失败:", err)
+      );
+    },
+
+    // 番茄钟事件处理（简化）
+    handleTimerStart() {
+      console.log("番茄钟开始");
+      // 这个事件已经被 handleUserStatusChange 处理了
+    },
+
+    handleTimerPause() {
+      console.log("番茄钟暂停");
+      // 暂停时状态不变，还是专注
+    },
+
+    handleTimerResume() {
+      console.log("番茄钟继续");
+      // 这个事件已经被 handleUserStatusChange 处理了
+    },
+
+    handleTimerStop() {
+      console.log("番茄钟停止");
+      // 这个事件已经被 handleUserStatusChange 处理了
+    },
+
+    handleFocusCompleted(sessions) {
+      console.log(`专注完成，已完成 ${sessions} 个番茄`);
+      // 这个事件已经被 handleUserStatusChange 处理了
+    },
+
+    handleBreakSkipped() {
+      console.log("休息被跳过");
+      // 这个事件已经被 handleUserStatusChange 处理了
     },
 
     // 加载当前用户信息
     async loadCurrentUser() {
       try {
-        const response = await getCurrentUser()
-        
+        const response = await getCurrentUser();
+
         if (response.success && response.data) {
-          this.currentUser = response.data
-          console.log('获取到当前用户:', this.currentUser)
+          this.currentUser = response.data;
+          console.log("获取到当前用户:", this.currentUser);
         } else {
-          console.warn('获取用户信息失败:', response)
+          console.warn("获取用户信息失败:", response);
           // 如果获取失败，设置默认值
           this.currentUser = {
-            id: 'user_unknown',
-            username: '未知用户'
-          }
+            id: "user_unknown",
+            username: "未知用户",
+          };
         }
       } catch (error) {
-        console.error('获取用户信息时出错:', error)
+        console.error("获取用户信息时出错:", error);
         this.currentUser = {
-          id: 'user_unknown',
-          username: '未知用户'
-        }
+          id: "user_unknown",
+          username: "未知用户",
+        };
       }
     },
 
     // 验证并加载房间数据
     async validateAndLoadRoom() {
       try {
-        this.loading = true
-        this.roomNotFound = false
-        
-        console.log('正在验证房间，roomId:', this.roomId)
-        
-        const response = await getRoomDetail(this.roomId, this.currentUserId)
-        console.log('房间验证响应:', response)
-        
-        if (response && (response.success === true || response.success === "true")) {
-          console.log('房间验证成功')
-          
+        this.loading = true;
+        this.roomNotFound = false;
+
+        console.log("正在验证房间，roomId:", this.roomId);
+
+        const response = await getRoomDetail(this.roomId, this.currentUserId);
+        console.log("房间验证响应:", response);
+
+        if (
+          response &&
+          (response.success === true || response.success === "true")
+        ) {
+          console.log("房间验证成功");
+
           if (response.data) {
             this.roomInfo = {
-              room_id: response.data.roomId || response.data.room_id || this.roomId,
-              room_name: response.data.roomName || response.data.room_name || '未命名自习室',
-              create_person: response.data.createPerson || response.data.create_person || '',
-              max_members: response.data.maxMembers || response.data.max_members || 4,
+              room_id:
+                response.data.roomId || response.data.room_id || this.roomId,
+              room_name:
+                response.data.roomName ||
+                response.data.room_name ||
+                "未命名自习室",
+              create_person:
+                response.data.createPerson || response.data.create_person || "",
+              max_members:
+                response.data.maxMembers || response.data.max_members || 4,
               current_time: response.data.current_time || 0,
               end_time: response.data.end_time || 0,
-              music_name: response.data.musicName || response.data.music_name || '无'
-            }
-            
-            console.log('房间信息:', this.roomInfo)
-            
+              music_name:
+                response.data.musicName || response.data.music_name || "无",
+            };
+
+            console.log("房间信息:", this.roomInfo);
+
             // 加载成员列表（loadMembersData 内部会调用 checkIfRoomOwner）
-            await this.loadMembersData()
-            
-            console.log('房间数据加载完成')
+            await this.loadMembersData();
+
+            console.log("房间数据加载完成");
           } else {
-            console.log('房间数据为空，视为不存在')
-            this.handleRoomDisbanded()
+            console.log("房间数据为空，视为不存在");
+            this.handleRoomDisbanded();
           }
         } else {
-          console.log('房间验证失败')
-          this.handleRoomDisbanded()
+          console.log("房间验证失败");
+          this.handleRoomDisbanded();
         }
       } catch (error) {
-        console.error('验证房间时出错:', error)
+        console.error("验证房间时出错:", error);
         // 检查是否是404错误（房间不存在/已被解散）
-        if (error.status === 404 || error.message?.includes('404') || error.message?.includes('不存在')) {
-          this.handleRoomDisbanded()
+        if (
+          error.status === 404 ||
+          error.message?.includes("404") ||
+          error.message?.includes("不存在")
+        ) {
+          this.handleRoomDisbanded();
         } else {
-          this.roomNotFound = true
+          this.roomNotFound = true;
         }
       } finally {
-        this.loading = false
-        this.lastRefreshTime = Date.now()
+        this.loading = false;
+        this.lastRefreshTime = Date.now();
       }
     },
 
     // 加载成员数据
     async loadMembersData() {
       try {
-        const response = await getRoomMembers(this.roomId, this.currentUserId)
-        console.log('成员列表响应:', response)
+        const response = await getRoomMembers(this.roomId, this.currentUserId);
+        console.log("成员列表响应:", response);
 
         // 兼容多种返回格式
-        const data = response?.data
-        const list = Array.isArray(data?.list) ? data.list
-          : Array.isArray(data?.members) ? data.members
-          : Array.isArray(data?.content) ? data.content
-          : Array.isArray(data) ? data
-          : []
+        const data = response?.data;
+        const list = Array.isArray(data?.list)
+          ? data.list
+          : Array.isArray(data?.members)
+          ? data.members
+          : Array.isArray(data?.content)
+          ? data.content
+          : Array.isArray(data)
+          ? data
+          : [];
 
         // 检查响应是否表示房间不存在
-        if (response.code === 404 || response.status === 404 || 
-            (response.success === false && (response.message?.includes('不存在') || response.message?.includes('已解散')))) {
-          console.log('检测到房间已被解散')
-          this.handleRoomDisbanded()
-          return
+        if (
+          response.code === 404 ||
+          response.status === 404 ||
+          (response.success === false &&
+            (response.message?.includes("不存在") ||
+              response.message?.includes("已解散")))
+        ) {
+          console.log("检测到房间已被解散");
+          this.handleRoomDisbanded();
+          return;
         }
 
-        if ((response.code === 200 || response.success === true) && list.length) {
-          const currentIdStr = this.normalizedCurrentUserId
-          console.log('当前用户ID（用于匹配）:', currentIdStr, '类型:', typeof currentIdStr)
-          console.log('成员列表原始数据:', list)
-          
-          this.members = list.map(member => {
+        if (
+          (response.code === 200 || response.success === true) &&
+          list.length
+        ) {
+          const currentIdStr = this.normalizedCurrentUserId;
+          console.log(
+            "当前用户ID（用于匹配）:",
+            currentIdStr,
+            "类型:",
+            typeof currentIdStr
+          );
+          console.log("成员列表原始数据:", list);
+
+          this.members = list.map((member) => {
             // ✅ 兼容多种ID字段：userId, user_id, id（注意：API返回的是 userId）
-            const rawId = member.userId ?? member.user_id ?? member.id
-            const memberIdStr = rawId !== undefined && rawId !== null ? String(rawId) : null
-            const isCurrentUser = currentIdStr !== null && memberIdStr !== null && memberIdStr === currentIdStr
-            
-            console.log('处理成员:', {
+            const rawId = member.userId ?? member.user_id ?? member.id;
+            const memberIdStr =
+              rawId !== undefined && rawId !== null ? String(rawId) : null;
+            const isCurrentUser =
+              currentIdStr !== null &&
+              memberIdStr !== null &&
+              memberIdStr === currentIdStr;
+
+            console.log("处理成员:", {
               rawId: rawId,
               memberIdStr: memberIdStr,
               currentIdStr: currentIdStr,
               isCurrentUser: isCurrentUser,
               role: member.role,
               username: member.username || member.name,
-              'member.userId': member.userId,
-              'member.user_id': member.user_id,
-              'member.id': member.id
-            })
+              "member.userId": member.userId,
+              "member.user_id": member.user_id,
+              "member.id": member.id,
+            });
 
             // 兼容不同字段的状态表示
-            const rawStatus = member.status ?? member.userStatus ?? member.state
+            const rawStatus =
+              member.status ?? member.userStatus ?? member.state;
             let normalizedStatus = (() => {
-              if (typeof rawStatus === 'string') {
-                const lower = rawStatus.toLowerCase()
-                if (['focus', 'focusing', 'focus_ing', '专注', '专注中'].includes(lower)) return 'focusing'
-                if (['rest', 'resting', '休息', '休息中'].includes(lower)) return 'resting'
+              if (typeof rawStatus === "string") {
+                const lower = rawStatus.toLowerCase();
+                if (
+                  ["focus", "focusing", "focus_ing", "专注", "专注中"].includes(
+                    lower
+                  )
+                )
+                  return "focusing";
+                if (["rest", "resting", "休息", "休息中"].includes(lower))
+                  return "resting";
               }
-              if (rawStatus === true || rawStatus === 1) return 'focusing'
-              if (rawStatus === false || rawStatus === 0) return 'resting'
-              if (member.isFocusing !== undefined) return member.isFocusing ? 'focusing' : 'resting'
-              return 'resting'
-            })()
+              if (rawStatus === true || rawStatus === 1) return "focusing";
+              if (rawStatus === false || rawStatus === 0) return "resting";
+              if (member.isFocusing !== undefined)
+                return member.isFocusing ? "focusing" : "resting";
+              return "resting";
+            })();
 
-            // 进入房间时，如果后端默认给了“专注中”，但前端还未开始番茄钟，则强制展示休息中，避免一进房就专注
+            // 进入房间时，如果后端默认给了"专注中"，但前端还未开始番茄钟，则保持后端状态
+            // 不再强制设置为休息中，让用户自主控制番茄钟状态
+            // 但需要确保用户状态与番茄钟实际运行状态一致
             if (isCurrentUser && !this.hasStartedFocus) {
-              normalizedStatus = 'resting'
+              // 如果用户手动启动了番茄钟，以番茄钟状态为准
+              // 否则保持后端返回的状态
+              // this.hasStartedFocus 会在番茄钟开始时被设置为 true
             }
 
             return {
               id: rawId,
               user_id: rawId,
-              name: member.username || member.name || `用户${memberIdStr || ''}`,
-              username: member.username || member.name || '',
+              name:
+                member.username || member.name || `用户${memberIdStr || ""}`,
+              username: member.username || member.name || "",
               role: member.role,
               status: normalizedStatus,
-              focusTime: normalizedStatus === 'focusing' ? this.calculateFocusTime(member) : '',
-              restTime: normalizedStatus === 'resting' ? '休息中' : '',
+              focusTime:
+                normalizedStatus === "focusing"
+                  ? this.calculateFocusTime(member)
+                  : "",
+              restTime: normalizedStatus === "resting" ? "休息中" : "",
               joined_at: member.joined_at,
-              isCurrentUser: isCurrentUser
-            }
-          })
+              isCurrentUser: isCurrentUser,
+            };
+          });
 
           // 更新当前用户状态
-          const currentMember = this.members.find(m => m.isCurrentUser)
+          const currentMember = this.members.find((m) => m.isCurrentUser);
           if (currentMember) {
-            const serverStatus = currentMember.status === 'focusing'
+            const serverStatus = currentMember.status === "focusing";
             // 如果服务器状态与本地状态不一致，且本地已经开始了专注，以本地为准
-            if (this.hasStartedFocus && this.userStatus.isFocusing !== serverStatus) {
-              console.log('服务器状态与本地不一致，以本地状态为准:', {
-                本地: this.userStatus.isFocusing ? 'focusing' : 'resting',
-                服务器: serverStatus ? 'focusing' : 'resting'
-              })
+            if (
+              this.hasStartedFocus &&
+              this.userStatus.isFocusing !== serverStatus
+            ) {
+              console.log("服务器状态与本地不一致，以本地状态为准:", {
+                本地: this.userStatus.isFocusing ? "focusing" : "resting",
+                服务器: serverStatus ? "focusing" : "resting",
+              });
               // 同步本地状态到服务器
-              this.updateUserStatusToServer()
+              this.updateUserStatusToServer();
             } else {
               // 否则以服务器状态为准（适用于刚进入房间时）
-              this.userStatus.isFocusing = serverStatus
+              this.userStatus.isFocusing = serverStatus;
               if (serverStatus && !this.userStatus.focusStartTime) {
-                this.userStatus.focusStartTime = Date.now()
-                this.startFocusTimer()
+                this.userStatus.focusStartTime = Date.now();
+                this.startFocusTimer();
               }
             }
-            console.log('当前用户信息:', {
+            console.log("当前用户信息:", {
               id: currentMember.id,
               name: currentMember.name,
               role: currentMember.role,
               isCurrentUser: currentMember.isCurrentUser,
-              status: currentMember.status
-            })
+              status: currentMember.status,
+            });
           } else {
-            console.warn('⚠️ 当前用户不在成员列表中')
-            console.log('成员列表:', this.members.map(m => ({ id: m.id, name: m.name, role: m.role })))
-            console.log('当前用户ID:', this.currentUserId, '类型:', typeof this.currentUserId)
+            console.warn("⚠️ 当前用户不在成员列表中");
+            console.log(
+              "成员列表:",
+              this.members.map((m) => ({
+                id: m.id,
+                name: m.name,
+                role: m.role,
+              }))
+            );
+            console.log(
+              "当前用户ID:",
+              this.currentUserId,
+              "类型:",
+              typeof this.currentUserId
+            );
           }
 
-          console.log('成员数据加载成功，当前成员数:', this.members.length)
-          
+          console.log("成员数据加载成功，当前成员数:", this.members.length);
+
           // 加载完成员列表后，立即检查是否为房主
-          this.checkIfRoomOwner()
-          console.log('房主状态检查结果:', this.isRoomOwner)
+          this.checkIfRoomOwner();
+          console.log("房主状态检查结果:", this.isRoomOwner);
         } else {
-          console.log('成员列表API返回异常或无数据，使用临时数据')
-          this.setTempMembersData()
+          console.log("成员列表API返回异常或无数据，使用临时数据");
+          this.setTempMembersData();
           // 即使使用临时数据，也检查一下
-          this.checkIfRoomOwner()
+          this.checkIfRoomOwner();
         }
       } catch (error) {
-        console.error('加载成员数据失败:', error)
+        console.error("加载成员数据失败:", error);
         // 检查是否是404错误（房间不存在/已被解散）
-        if (error.status === 404 || error.message?.includes('404') || error.message?.includes('不存在') || error.message?.includes('已解散')) {
-          console.log('检测到房间已被解散（从错误中）')
-          this.handleRoomDisbanded()
-          return
+        if (
+          error.status === 404 ||
+          error.message?.includes("404") ||
+          error.message?.includes("不存在") ||
+          error.message?.includes("已解散")
+        ) {
+          console.log("检测到房间已被解散（从错误中）");
+          this.handleRoomDisbanded();
+          return;
         }
-        this.setTempMembersData()
+        this.setTempMembersData();
         // 即使失败，也检查一下
-        this.checkIfRoomOwner()
+        this.checkIfRoomOwner();
       }
     },
 
@@ -486,474 +675,503 @@ export default {
     setTempMembersData() {
       this.members = [
         {
-          id: this.currentUserId || 'user_unknown',
-          user_id: this.currentUserId || 'user_unknown',
-          name: this.currentUser?.username || '用户',
-          username: this.currentUser?.username || '用户',
-          role: 'host',
-          status: this.userStatus.isFocusing ? 'focusing' : 'resting',
-          focusTime: this.userStatus.isFocusing ? '进行中' : '',
-          restTime: this.userStatus.isFocusing ? '' : '休息中',
+          id: this.currentUserId || "user_unknown",
+          user_id: this.currentUserId || "user_unknown",
+          name: this.currentUser?.username || "用户",
+          username: this.currentUser?.username || "用户",
+          role: "host",
+          status: this.userStatus.isFocusing ? "focusing" : "resting",
+          focusTime: this.userStatus.isFocusing ? "进行中" : "",
+          restTime: this.userStatus.isFocusing ? "" : "休息中",
           joined_at: new Date().toISOString(),
-          isCurrentUser: true
-        }
-      ]
+          isCurrentUser: true,
+        },
+      ];
     },
 
     calculateFocusTime(member) {
-      if (member.status !== 'focusing') return ''
-      
+      if (member.status !== "focusing") return "";
+
       if (member.focus_start_time) {
-        const startTime = new Date(member.focus_start_time).getTime()
-        const now = Date.now()
-        const elapsed = now - startTime
-        return this.formatTime(elapsed)
+        const startTime = new Date(member.focus_start_time).getTime();
+        const now = Date.now();
+        const elapsed = now - startTime;
+        return this.formatTime(elapsed);
       }
-      
-      return '进行中'
+
+      return "进行中";
     },
 
     formatTime(ms) {
-      const totalSeconds = Math.floor(ms / 1000)
-      const hours = Math.floor(totalSeconds / 3600)
-      const minutes = Math.floor((totalSeconds % 3600) / 60)
-      const seconds = totalSeconds % 60
-      
-      return `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`
+      const totalSeconds = Math.floor(ms / 1000);
+      const hours = Math.floor(totalSeconds / 3600);
+      const minutes = Math.floor((totalSeconds % 3600) / 60);
+      const seconds = totalSeconds % 60;
+
+      return `${hours.toString().padStart(2, "0")}:${minutes
+        .toString()
+        .padStart(2, "0")}:${seconds.toString().padStart(2, "0")}`;
     },
 
     checkIfRoomOwner() {
-      const currentMember = this.members.find(member => member.isCurrentUser)
-      
+      const currentMember = this.members.find((member) => member.isCurrentUser);
+
       if (!currentMember) {
-        console.warn('checkIfRoomOwner: 当前用户不在成员列表中')
-        console.log('所有成员:', this.members.map(m => ({
-          id: m.id,
-          name: m.name,
-          role: m.role,
-          isCurrentUser: m.isCurrentUser
-        })))
-        console.log('当前用户ID:', this.currentUserId, '类型:', typeof this.currentUserId)
-        this.isRoomOwner = false
-        return false
+        console.warn("checkIfRoomOwner: 当前用户不在成员列表中");
+        console.log(
+          "所有成员:",
+          this.members.map((m) => ({
+            id: m.id,
+            name: m.name,
+            role: m.role,
+            isCurrentUser: m.isCurrentUser,
+          }))
+        );
+        console.log(
+          "当前用户ID:",
+          this.currentUserId,
+          "类型:",
+          typeof this.currentUserId
+        );
+        this.isRoomOwner = false;
+        return false;
       }
-      
+
       // 兼容多种 role 值：host, owner, creator, admin 等
-      const role = currentMember.role
-      const normalizedRole = typeof role === 'string' ? role.toLowerCase() : role
-      
+      const role = currentMember.role;
+      const normalizedRole =
+        typeof role === "string" ? role.toLowerCase() : role;
+
       // 判断是否为房主：host, owner, creator, admin 都视为房主
-      const isOwner = normalizedRole === 'host' || 
-                     normalizedRole === 'owner' || 
-                     normalizedRole === 'creator' || 
-                     normalizedRole === 'admin' ||
-                     normalizedRole === '房主'
-      
-      this.isRoomOwner = isOwner
-      
-      console.log('checkIfRoomOwner 结果:', {
+      const isOwner =
+        normalizedRole === "host" ||
+        normalizedRole === "owner" ||
+        normalizedRole === "creator" ||
+        normalizedRole === "admin" ||
+        normalizedRole === "房主";
+
+      this.isRoomOwner = isOwner;
+
+      console.log("checkIfRoomOwner 结果:", {
         currentMember: {
           id: currentMember.id,
           name: currentMember.name,
           role: role,
-          normalizedRole: normalizedRole
+          normalizedRole: normalizedRole,
         },
-        isRoomOwner: this.isRoomOwner
-      })
-      
+        isRoomOwner: this.isRoomOwner,
+      });
+
       // 如果应该是房主但不是，输出警告
       if (!this.isRoomOwner && role) {
-        console.warn('⚠️ 用户可能是房主，但 role 值不匹配:', role, '支持的 role 值: host, owner, creator, admin')
+        console.warn(
+          "⚠️ 用户可能是房主，但 role 值不匹配:",
+          role,
+          "支持的 role 值: host, owner, creator, admin"
+        );
       }
-      
-      return this.isRoomOwner
+
+      return this.isRoomOwner;
     },
-    
+
     // 获取当前用户的角色（用于调试显示）
     getCurrentUserRole() {
-      const currentMember = this.members.find(member => member.isCurrentUser)
+      const currentMember = this.members.find((member) => member.isCurrentUser);
       if (!currentMember) {
-        return '未找到（不在成员列表中）'
+        return "未找到（不在成员列表中）";
       }
-      return currentMember.role || '无角色'
+      return currentMember.role || "无角色";
     },
 
     // 同步用户状态到服务器
     async updateUserStatusToServer() {
       if (!this.roomId || !this.currentUserId) {
-        console.warn('无法更新状态：缺少房间ID或用户ID')
-        return
+        console.warn("无法更新状态：缺少房间ID或用户ID");
+        return;
       }
 
-      const status = this.userStatus.isFocusing ? 'focusing' : 'resting'
+      const status = this.userStatus.isFocusing ? "focusing" : "resting";
       const statusData = {
         userId: this.currentUserId,
         status: status,
         isFocusing: this.userStatus.isFocusing,
-        focusStartTime: this.userStatus.isFocusing && this.userStatus.focusStartTime 
-          ? new Date(this.userStatus.focusStartTime).toISOString() 
-          : null
-      }
+        focusStartTime:
+          this.userStatus.isFocusing && this.userStatus.focusStartTime
+            ? new Date(this.userStatus.focusStartTime).toISOString()
+            : null,
+      };
 
       try {
-        console.log('同步用户状态到服务器:', statusData)
-        const response = await updateUserStatus(this.roomId, statusData)
-        console.log('状态同步响应:', response)
-        this.statusChanged = false
+        console.log("同步用户状态到服务器:", statusData);
+        const response = await updateUserStatus(this.roomId, statusData);
+        console.log("状态同步响应:", response);
+        this.statusChanged = false;
       } catch (error) {
-        console.error('同步用户状态失败:', error)
+        console.error("同步用户状态失败:", error);
         // 即使同步失败，也继续更新本地状态，保证用户体验
       }
     },
 
     startFocusTimer() {
-      this.userStatus.focusStartTime = Date.now()
-      
+      this.userStatus.focusStartTime = Date.now();
+
       if (this.focusTimer) {
-        clearInterval(this.focusTimer)
+        clearInterval(this.focusTimer);
       }
-      
+
       this.focusTimer = setInterval(() => {
         if (this.userStatus.isFocusing) {
-          const elapsed = Date.now() - this.userStatus.focusStartTime
-          this.userStatus.focusTime = this.formatTime(elapsed)
-          
-          const currentMember = this.members.find(member => member.isCurrentUser)
+          const elapsed = Date.now() - this.userStatus.focusStartTime;
+          this.userStatus.focusTime = this.formatTime(elapsed);
+
+          const currentMember = this.members.find(
+            (member) => member.isCurrentUser
+          );
           if (currentMember) {
-            currentMember.focusTime = this.userStatus.focusTime
+            currentMember.focusTime = this.userStatus.focusTime;
           }
         }
-      }, 1000)
+      }, 1000);
     },
 
     stopFocusTimer() {
       if (this.focusTimer) {
-        clearInterval(this.focusTimer)
-        this.focusTimer = null
+        clearInterval(this.focusTimer);
+        this.focusTimer = null;
       }
-      this.userStatus.focusTime = '00:00:00'
+      this.userStatus.focusTime = "00:00:00";
     },
 
     getInitials(name) {
-      if (!name) return '?'
-      return name.charAt(0).toUpperCase()
+      if (!name) return "?";
+      return name.charAt(0).toUpperCase();
     },
 
     // 番茄钟事件
     handleTimerStart() {
-      console.log('番茄钟开始 - 切换到专注状态')
-      this.syncLocalStatus('focusing')
+      console.log("番茄钟开始 - 切换到专注状态");
+      this.syncLocalStatus("focusing");
     },
-    
+
     handleTimerPause() {
-      console.log('番茄钟暂停 - 保持专注状态')
+      console.log("番茄钟暂停 - 保持专注状态");
       // 暂停时仍视为专注态，不切换状态
       // 但可以更新一下服务器状态，确保状态一致
       if (this.userStatus.isFocusing) {
-        this.updateUserStatusToServer()
+        this.updateUserStatusToServer();
       }
     },
-    
+
     handleTimerResume() {
-      console.log('番茄钟继续 - 保持专注状态')
+      console.log("番茄钟继续 - 保持专注状态");
       // 继续时确保状态为专注
       if (!this.userStatus.isFocusing) {
-        this.syncLocalStatus('focusing')
+        this.syncLocalStatus("focusing");
       } else {
         // 如果已经是专注状态，只更新服务器
-        this.updateUserStatusToServer()
+        this.updateUserStatusToServer();
       }
     },
-    
+
     handleTimerStop() {
-      console.log('番茄钟停止 - 切换到休息状态')
-      this.syncLocalStatus('resting')
+      console.log("番茄钟停止 - 切换到休息状态");
+      this.syncLocalStatus("resting");
     },
-    
+
     handleFocusCompleted(sessions) {
-      console.log(`专注完成，已完成 ${sessions} 个番茄 - 进入休息状态`)
+      console.log(`专注完成，已完成 ${sessions} 个番茄 - 进入休息状态`);
       // 专注完成，进入休息
-      this.syncLocalStatus('resting')
+      this.syncLocalStatus("resting");
     },
-    
+
     handleBreakSkipped() {
-      console.log('休息被跳过 - 切换到专注状态')
-      this.syncLocalStatus('focusing')
+      console.log("休息被跳过 - 切换到专注状态");
+      this.syncLocalStatus("focusing");
     },
 
     showRoomSettings() {
-      this.showSettings = true
+      this.showSettings = true;
     },
 
     closeSettings() {
-      this.showSettings = false
+      this.showSettings = false;
     },
 
     async leaveRoom() {
-      const userConfirmed = confirm('确定要退出自习室吗？')
-      if (!userConfirmed) return
+      const userConfirmed = confirm("确定要退出自习室吗？");
+      if (!userConfirmed) return;
 
       // 先验证用户ID，避免不必要的 loading 状态
-      console.log('正在退出房间...')
-      console.log('房间ID:', this.roomId)
-      console.log('当前用户ID:', this.currentUserId)
-      console.log('用户ID类型:', typeof this.currentUserId)
-      
+      console.log("正在退出房间...");
+      console.log("房间ID:", this.roomId);
+      console.log("当前用户ID:", this.currentUserId);
+      console.log("用户ID类型:", typeof this.currentUserId);
+
       // 如果用户ID为空，尝试重新加载用户信息
       if (!this.currentUserId && this.currentUserId !== 0) {
-        console.warn('用户ID为空，尝试重新加载用户信息...')
+        console.warn("用户ID为空，尝试重新加载用户信息...");
         try {
-          await this.loadCurrentUser()
+          await this.loadCurrentUser();
           if (!this.currentUserId && this.currentUserId !== 0) {
-            console.error('重新加载后用户ID仍为空:', this.currentUserId)
-            alert('用户身份信息错误，无法退出。请尝试刷新页面或重新登录。')
-            return
+            console.error("重新加载后用户ID仍为空:", this.currentUserId);
+            alert("用户身份信息错误，无法退出。请尝试刷新页面或重新登录。");
+            return;
           }
         } catch (error) {
-          console.error('重新加载用户信息失败:', error)
-          alert('获取用户信息失败，无法退出。请尝试刷新页面或重新登录。')
-          return
+          console.error("重新加载用户信息失败:", error);
+          alert("获取用户信息失败，无法退出。请尝试刷新页面或重新登录。");
+          return;
         }
       }
-      
+
       // 尝试将用户ID转换为数字
-      let userId = null
-      if (typeof this.currentUserId === 'number') {
-        userId = this.currentUserId
-      } else if (typeof this.currentUserId === 'string') {
+      let userId = null;
+      if (typeof this.currentUserId === "number") {
+        userId = this.currentUserId;
+      } else if (typeof this.currentUserId === "string") {
         // 如果是字符串，尝试转换为数字
-        const numId = Number(this.currentUserId)
-        if (!isNaN(numId) && this.currentUserId.trim() !== '') {
-          userId = numId
+        const numId = Number(this.currentUserId);
+        if (!isNaN(numId) && this.currentUserId.trim() !== "") {
+          userId = numId;
         }
       } else {
         // 尝试直接转换
-        const numId = Number(this.currentUserId)
+        const numId = Number(this.currentUserId);
         if (!isNaN(numId)) {
-          userId = numId
+          userId = numId;
         }
       }
-      
+
       if (userId === null || isNaN(userId)) {
-        console.error('用户ID不是有效的数字:', this.currentUserId)
-        alert('用户身份信息错误，无法退出。请尝试刷新页面或重新登录。')
-        return
+        console.error("用户ID不是有效的数字:", this.currentUserId);
+        alert("用户身份信息错误，无法退出。请尝试刷新页面或重新登录。");
+        return;
       }
-      
-      this.loading = true
-      
+
+      this.loading = true;
+
       try {
         // 清理定时器
-        this.stopMembersAutoRefresh()
+        this.stopMembersAutoRefresh();
         if (this.focusTimer) {
-          clearInterval(this.focusTimer)
-          this.focusTimer = null
+          clearInterval(this.focusTimer);
+          this.focusTimer = null;
         }
-        
-        console.log(`发送退出请求: /api/rooms/${this.roomId}/leave?userId=${userId}`)
-        console.log('退出逻辑说明: 此API会从后端成员列表中删除当前用户')
-        
+
+        console.log(
+          `发送退出请求: /api/rooms/${this.roomId}/leave?userId=${userId}`
+        );
+        console.log("退出逻辑说明: 此API会从后端成员列表中删除当前用户");
+
         // ✅ 调用退出房间API，传递用户ID
         // 这个API应该从后端的成员列表中删除该用户
-        const response = await leaveRoom(this.roomId, userId)
-        console.log('退出房间API响应:', response)
-        console.log('响应详情:', JSON.stringify(response, null, 2))
-        
+        const response = await leaveRoom(this.roomId, userId);
+        console.log("退出房间API响应:", response);
+        console.log("响应详情:", JSON.stringify(response, null, 2));
+
         // 处理响应 - 兼容多种响应格式
-        const isSuccess = response && (
-          response.code === 200 || 
-          response.success === true || 
-          response.success === "true" ||
-          (response.status === undefined && response.code === undefined && !response.message)
-        )
-        
+        const isSuccess =
+          response &&
+          (response.code === 200 ||
+            response.success === true ||
+            response.success === "true" ||
+            (response.status === undefined &&
+              response.code === undefined &&
+              !response.message));
+
         if (isSuccess) {
-          console.log('✅ 退出房间成功')
-          console.log('说明: 用户已从后端成员列表中移除，其他用户的成员列表会在下次自动刷新时更新（最多5秒）')
-          
+          console.log("✅ 退出房间成功");
+          console.log(
+            "说明: 用户已从后端成员列表中移除，其他用户的成员列表会在下次自动刷新时更新（最多5秒）"
+          );
+
           // 显示成功消息
-          alert('已成功退出自习室')
-          
+          alert("已成功退出自习室");
+
           // 跳转到首页
-          this.goToHome()
+          this.goToHome();
         } else {
-          const errorMsg = response?.message || response?.error || '退出失败'
-          console.error('退出房间失败:', errorMsg)
-          console.error('响应对象:', response)
-          alert(`退出失败: ${errorMsg}`)
+          const errorMsg = response?.message || response?.error || "退出失败";
+          console.error("退出房间失败:", errorMsg);
+          console.error("响应对象:", response);
+          alert(`退出失败: ${errorMsg}`);
         }
-        
       } catch (error) {
-        console.error('退出房间请求失败:', error)
-        
+        console.error("退出房间请求失败:", error);
+
         // 详细的错误处理 - 适配 fetch API 的错误格式
-        let errorMessage = '退出失败'
-        
+        let errorMessage = "退出失败";
+
         if (error.status) {
           // fetch API 返回的错误可能包含 status
           if (error.status === 404) {
-            errorMessage = '房间不存在'
+            errorMessage = "房间不存在";
           } else if (error.status === 403) {
-            errorMessage = '权限不足，无法退出'
+            errorMessage = "权限不足，无法退出";
           } else if (error.status === 400 || error.status === 500) {
-            errorMessage = `服务器错误: ${error.status}`
+            errorMessage = `服务器错误: ${error.status}`;
           } else {
-            errorMessage = `退出失败: ${error.message || `服务器错误: ${error.status}`}`
+            errorMessage = `退出失败: ${
+              error.message || `服务器错误: ${error.status}`
+            }`;
           }
         } else if (error.message) {
-          errorMessage = error.message
-          if (error.message.includes('无法连接到服务器')) {
-            errorMessage = '无法连接到服务器，请检查网络连接'
+          errorMessage = error.message;
+          if (error.message.includes("无法连接到服务器")) {
+            errorMessage = "无法连接到服务器，请检查网络连接";
           }
         }
-        
-        alert(errorMessage)
+
+        alert(errorMessage);
       } finally {
-        this.loading = false
+        this.loading = false;
       }
     },
-    
+
     goToHome() {
-      this.$router.push('/')
+      this.$router.push("/");
     },
 
     goToJoinRoom() {
-      this.$router.push('/join-room')
+      this.$router.push("/join-room");
     },
 
     async disbandRoom() {
       if (!this.isRoomOwner) {
-        console.warn('非房主尝试解散房间')
-        return
+        console.warn("非房主尝试解散房间");
+        return;
       }
-      
+
       // 使用更友好的确认对话框
       const confirmed = confirm(
-        '⚠️ 确定要解散自习室吗？\n\n' +
-        '• 房间将被永久删除\n' +
-        '• 所有成员将被移出\n' +
-        '• 此操作不可恢复\n\n' +
-        '如果确定，请点击"确定"'
-      )
-      
+        "⚠️ 确定要解散自习室吗？\n\n" +
+          "• 房间将被永久删除\n" +
+          "• 所有成员将被移出\n" +
+          "• 此操作不可恢复\n\n" +
+          '如果确定，请点击"确定"'
+      );
+
       if (!confirmed) {
-        console.log('用户取消解散房间')
-        return
+        console.log("用户取消解散房间");
+        return;
       }
 
       try {
-        this.loading = true
-        
+        this.loading = true;
+
         // 停止自动刷新，避免在解散过程中继续刷新
-        this.stopMembersAutoRefresh()
-        
-        console.log('开始解散房间...')
-        console.log('房间ID:', this.roomId)
-        console.log('用户ID:', this.currentUserId)
-        
-        const userIdNumber = Number(this.currentUserId)
-        const userIdForRequest = isNaN(userIdNumber) ? this.currentUserId : userIdNumber
-        
-        console.log('调用解散房间API...')
-        const response = await deleteRoom(this.roomId, userIdForRequest)
-        console.log('解散房间响应:', response)
-        
+        this.stopMembersAutoRefresh();
+
+        console.log("开始解散房间...");
+        console.log("房间ID:", this.roomId);
+        console.log("用户ID:", this.currentUserId);
+
+        const userIdNumber = Number(this.currentUserId);
+        const userIdForRequest = isNaN(userIdNumber)
+          ? this.currentUserId
+          : userIdNumber;
+
+        console.log("调用解散房间API...");
+        const response = await deleteRoom(this.roomId, userIdForRequest);
+        console.log("解散房间响应:", response);
+
         if (response && (response.code === 200 || response.success === true)) {
-          console.log('✅ 自习室解散成功')
-          alert('✅ 自习室已成功解散')
-          this.goToHome()
+          console.log("✅ 自习室解散成功");
+          alert("✅ 自习室已成功解散");
+          this.goToHome();
         } else {
-          const errorMsg = response?.message || '解散失败，请稍后再试'
-          console.error('解散房间失败:', errorMsg)
-          alert(`解散失败: ${errorMsg}`)
+          const errorMsg = response?.message || "解散失败，请稍后再试";
+          console.error("解散房间失败:", errorMsg);
+          alert(`解散失败: ${errorMsg}`);
         }
       } catch (error) {
-        console.error('解散房间失败:', error)
-        let errorMessage = '解散失败，请稍后再试'
-        
+        console.error("解散房间失败:", error);
+        let errorMessage = "解散失败，请稍后再试";
+
         if (error.message) {
-          errorMessage = error.message
+          errorMessage = error.message;
         } else if (error.status) {
           if (error.status === 403) {
-            errorMessage = '权限不足，无法解散自习室'
+            errorMessage = "权限不足，无法解散自习室";
           } else if (error.status === 404) {
-            errorMessage = '房间不存在'
+            errorMessage = "房间不存在";
           } else {
-            errorMessage = `服务器错误: ${error.status}`
+            errorMessage = `服务器错误: ${error.status}`;
           }
         }
-        
-        alert(errorMessage)
+
+        alert(errorMessage);
       } finally {
-        this.loading = false
+        this.loading = false;
       }
     },
 
     startMembersAutoRefresh() {
       if (this.refreshTimer) {
-        clearInterval(this.refreshTimer)
+        clearInterval(this.refreshTimer);
       }
       this.refreshTimer = setInterval(() => {
         // 如果房间已不存在，停止刷新
         if (this.roomNotFound) {
-          this.stopMembersAutoRefresh()
-          return
+          this.stopMembersAutoRefresh();
+          return;
         }
-        this.loadMembersData()
-      }, this.refreshInterval)
+        this.loadMembersData();
+      }, this.refreshInterval);
     },
 
     stopMembersAutoRefresh() {
       if (this.refreshTimer) {
-        clearInterval(this.refreshTimer)
-        this.refreshTimer = null
+        clearInterval(this.refreshTimer);
+        this.refreshTimer = null;
       }
     },
 
     // 处理房间被解散的情况
     handleRoomDisbanded() {
-      console.log('房间已被解散，准备跳转')
-      
+      console.log("房间已被解散，准备跳转");
+
       // 停止所有定时器
-      this.stopMembersAutoRefresh()
+      this.stopMembersAutoRefresh();
       if (this.focusTimer) {
-        clearInterval(this.focusTimer)
-        this.focusTimer = null
+        clearInterval(this.focusTimer);
+        this.focusTimer = null;
       }
-      
+
       // 设置房间不存在标志
-      this.roomNotFound = true
-      
+      this.roomNotFound = true;
+
       // 显示提示信息
-      alert('⚠️ 自习室已被房主解散\n\n所有成员已被移出，即将返回首页')
-      
+      alert("⚠️ 自习室已被房主解散\n\n所有成员已被移出，即将返回首页");
+
       // 延迟跳转，让用户看到提示
       setTimeout(() => {
-        this.goToHome()
-      }, 500)
+        this.goToHome();
+      }, 500);
     },
 
     updateMemberStatusLocally(status) {
-      const currentIdStr = this.normalizedCurrentUserId
-      if (!currentIdStr) return
-      let found = false
-      this.members = this.members.map(member => {
-        const memberIdStr = member?.user_id !== undefined && member?.user_id !== null
-          ? String(member.user_id)
-          : member?.id !== undefined && member?.id !== null
+      const currentIdStr = this.normalizedCurrentUserId;
+      if (!currentIdStr) return;
+      let found = false;
+      this.members = this.members.map((member) => {
+        const memberIdStr =
+          member?.user_id !== undefined && member?.user_id !== null
+            ? String(member.user_id)
+            : member?.id !== undefined && member?.id !== null
             ? String(member.id)
-            : null
+            : null;
         if (memberIdStr && memberIdStr === currentIdStr) {
-          found = true
+          found = true;
           return {
             ...member,
             status,
-            focusTime: status === 'focusing' ? '进行中' : '',
-            restTime: status === 'resting' ? '休息中' : ''
-          }
+            focusTime: status === "focusing" ? "进行中" : "",
+            restTime: status === "resting" ? "休息中" : "",
+          };
         }
-        return member
-      })
+        return member;
+      });
 
       // 如果当前用户不在列表，补充一条以保证前端立即显示
       if (!found) {
@@ -962,27 +1180,27 @@ export default {
           {
             id: currentIdStr,
             user_id: currentIdStr,
-            name: this.currentUser?.username || '用户',
-            username: this.currentUser?.username || '用户',
-            role: this.isRoomOwner ? 'host' : 'member',
+            name: this.currentUser?.username || "用户",
+            username: this.currentUser?.username || "用户",
+            role: this.isRoomOwner ? "host" : "member",
             status,
-            focusTime: status === 'focusing' ? '进行中' : '',
-            restTime: status === 'resting' ? '休息中' : '',
-            isCurrentUser: true
-          }
-        ]
+            focusTime: status === "focusing" ? "进行中" : "",
+            restTime: status === "resting" ? "休息中" : "",
+            isCurrentUser: true,
+          },
+        ];
       }
-    }
+    },
   },
   beforeUnmount() {
     // 清理所有定时器
-    this.stopMembersAutoRefresh()
+    this.stopMembersAutoRefresh();
     if (this.focusTimer) {
-      clearInterval(this.focusTimer)
-      this.focusTimer = null
+      clearInterval(this.focusTimer);
+      this.focusTimer = null;
     }
-  }
-}
+  },
+};
 </script>
 
 <style scoped>
@@ -1060,8 +1278,12 @@ export default {
 }
 
 @keyframes spin {
-  0% { transform: rotate(0deg); }
-  100% { transform: rotate(360deg); }
+  0% {
+    transform: rotate(0deg);
+  }
+  100% {
+    transform: rotate(360deg);
+  }
 }
 
 .loading-container p {
@@ -1162,8 +1384,14 @@ export default {
 }
 
 @keyframes fadeIn {
-  from { opacity: 0; transform: translateY(10px); }
-  to { opacity: 1; transform: translateY(0); }
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
 }
 
 /* 房间头部 */
@@ -1296,12 +1524,18 @@ export default {
   gap: 20px;
 }
 
-.timer-section {
+/* 番茄钟组件样式 */
+.timer-component {
   background: white;
   border-radius: 16px;
   padding: 30px;
   box-shadow: 0 4px 20px rgba(0, 0, 0, 0.08);
   border: 1px solid #e9ecef;
+  width: 100%;
+  height: 100%; /* 让高度自动适应 */
+  min-height: 550px; /* 设置最小高度与下方一致 */
+  display: flex;
+  flex-direction: column;
 }
 
 .user-status-section {
@@ -1558,7 +1792,7 @@ export default {
   .room-layout {
     grid-template-columns: 1fr;
   }
-  
+
   .right-section {
     position: static;
   }
@@ -1568,41 +1802,41 @@ export default {
   .main-content {
     padding: 20px;
   }
-  
+
   .room-header {
     flex-direction: column;
     gap: 20px;
     align-items: flex-start;
     padding: 20px;
   }
-  
+
   .room-title {
     font-size: 1.8em;
   }
-  
+
   .room-meta {
     flex-direction: column;
     gap: 10px;
   }
-  
+
   .section-header {
     flex-direction: column;
     gap: 12px;
     align-items: flex-start;
   }
-  
+
   .stats {
     align-self: flex-start;
   }
-  
+
   .navbar {
     padding: 12px 20px;
   }
-  
+
   .nav-links {
     gap: 10px;
   }
-  
+
   .nav-link {
     padding: 6px 12px;
     font-size: 0.9em;
