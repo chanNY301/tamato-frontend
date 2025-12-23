@@ -62,8 +62,12 @@
                     >
                       完成
                     </button>
-                    <!-- 编辑按钮 -->
-                    <button @click="editTask(task)" class="action-btn edit-btn">
+                    <!-- 编辑按钮 - 已完成的任务不可编辑 -->
+                    <button 
+                      v-if="!isTaskCompleted(task)"
+                      @click="editTask(task)" 
+                      class="action-btn edit-btn"
+                    >
                       编辑
                     </button>
                     <!-- 删除按钮 -->
@@ -470,6 +474,13 @@ export default {
     async submitTask() {
       try {
         if (this.editingTask) {
+          // 已完成的任务不可编辑
+          if (this.isTaskCompleted(this.editingTask)) {
+            alert('已完成的任务不可编辑')
+            this.closeModal()
+            return
+          }
+          
           // 编辑现有任务
           const taskId = this.getTaskId(this.editingTask)
           const updateData = {
@@ -544,6 +555,12 @@ export default {
     },
 
     editTask(task) {
+      // 已完成的任务不可编辑
+      if (this.isTaskCompleted(task)) {
+        alert('已完成的任务不可编辑')
+        return
+      }
+      
       this.editingTask = task
       this.taskForm = {
         task_name: this.getTaskName(task),

@@ -1,5 +1,6 @@
 // 使用 fetch 替代 axios
-import { getToken } from './config'
+import { getToken, removeToken } from './config'
+import router from '@/router'
 
 // 构建请求头
 const buildHeaders = (includeAuth = true) => {
@@ -47,6 +48,21 @@ const request = {
       }
       
       if (!response.ok) {
+        // 处理 401 未授权错误（token过期或无效）
+        if (response.status === 401) {
+          console.warn('⚠️ Token已过期或无效，清除token并跳转到登录页')
+          removeToken()
+          // 如果不在登录页，跳转到登录页
+          if (router.currentRoute.value.path !== '/login') {
+            router.push('/login')
+          }
+          const error = new Error('登录已过期，请重新登录')
+          error.status = 401
+          error.isUnauthorized = true
+          error.response = response
+          throw error
+        }
+        
         let errorText = ''
         try {
           errorText = await response.text()
@@ -94,6 +110,20 @@ const request = {
       if (contentType && contentType.includes('application/json')) {
         try {
           result = await response.json()
+          // 如果是401错误，处理token过期
+          if (response.status === 401) {
+            console.warn('⚠️ Token已过期或无效，清除token并跳转到登录页')
+            removeToken()
+            // 如果不在登录页，跳转到登录页
+            if (router.currentRoute.value.path !== '/login') {
+              router.push('/login')
+            }
+            const error = new Error('登录已过期，请重新登录')
+            error.status = 401
+            error.isUnauthorized = true
+            error.response = response
+            throw error
+          }
           // 如果是404错误，返回错误信息
           if (response.status === 404) {
             const error = new Error(result.message || '用户不存在')
@@ -107,12 +137,31 @@ const request = {
             return result
           }
         } catch (e) {
+          // 如果已经是我们抛出的错误，直接抛出
+          if (e.isUnauthorized || e.status === 401) {
+            throw e
+          }
           // JSON 解析失败，继续使用文本方式
           console.error('JSON 解析失败:', e)
         }
       }
       
       if (!response.ok) {
+        // 处理 401 未授权错误（token过期或无效）
+        if (response.status === 401) {
+          console.warn('⚠️ Token已过期或无效，清除token并跳转到登录页')
+          removeToken()
+          // 如果不在登录页，跳转到登录页
+          if (router.currentRoute.value.path !== '/login') {
+            router.push('/login')
+          }
+          const error = new Error('登录已过期，请重新登录')
+          error.status = 401
+          error.isUnauthorized = true
+          error.response = response
+          throw error
+        }
+        
         let errorText = ''
         try {
           errorText = await response.text()
@@ -163,6 +212,21 @@ const request = {
       })
       
       if (!response.ok) {
+        // 处理 401 未授权错误（token过期或无效）
+        if (response.status === 401) {
+          console.warn('⚠️ Token已过期或无效，清除token并跳转到登录页')
+          removeToken()
+          // 如果不在登录页，跳转到登录页
+          if (router.currentRoute.value.path !== '/login') {
+            router.push('/login')
+          }
+          const error = new Error('登录已过期，请重新登录')
+          error.status = 401
+          error.isUnauthorized = true
+          error.response = response
+          throw error
+        }
+        
         const errorText = await response.text()
         console.error('❌ PUT请求失败:', response.status, errorText)
         throw new Error(`请求失败: ${response.status} ${errorText}`)
@@ -196,6 +260,21 @@ const request = {
       const response = await fetch(url, fetchOptions)
       
       if (!response.ok) {
+        // 处理 401 未授权错误（token过期或无效）
+        if (response.status === 401) {
+          console.warn('⚠️ Token已过期或无效，清除token并跳转到登录页')
+          removeToken()
+          // 如果不在登录页，跳转到登录页
+          if (router.currentRoute.value.path !== '/login') {
+            router.push('/login')
+          }
+          const error = new Error('登录已过期，请重新登录')
+          error.status = 401
+          error.isUnauthorized = true
+          error.response = response
+          throw error
+        }
+        
         const errorText = await response.text()
         console.error('❌ DELETE请求失败:', response.status, errorText)
         throw new Error(`请求失败: ${response.status} ${errorText}`)

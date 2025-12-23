@@ -9,6 +9,7 @@
         :logo="logoUrl"
         @submit="handleLogin"
         @toggle-mode="$router.push('/register')"
+        @forgot-password="$router.push('/forgot-password')"
       >
         <template #form-fields>
           <FormInput
@@ -111,7 +112,7 @@ export default {
         if (result.success) {
           // 登录成功，跳转到首页
           setTimeout(() => {
-            this.$router.push('/')
+            this.$router.push('/home')
           }, 800)
         } else {
           // 使用友好的错误消息

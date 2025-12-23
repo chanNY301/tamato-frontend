@@ -71,3 +71,8 @@ export const getCurrentMonthCheckInDates = async () => {
   return request.get(`${API_BASE_URL}/me/checkin/dates`)
 }
 
+// 结束专注
+export const stopFocus = async () => {
+  return request.post(`${API_BASE_URL}/focus/stop`)
+}
+

@@ -2,8 +2,8 @@
   <div class="auth-form">
     <div class="auth-header">
       <img :src="logo" alt="Logo" class="logo" />
-      <h2>{{ isLogin ? '欢迎回来' : '创建账户' }}</h2>
-      <p>{{ isLogin ? '请登录您的账户' : '注册新账户开始使用' }}</p>
+      <h2>{{ isLogin ? '欢迎回来' : (isForgotPassword ? '找回密码' : '创建账户') }}</h2>
+      <p>{{ isLogin ? '请登录您的账户' : (isForgotPassword ? '通过邮箱验证重置您的密码' : '注册新账户开始使用') }}</p>
     </div>
 
     <form @submit.prevent="handleSubmit" class="auth-form-container">
@@ -14,10 +14,11 @@
           <input type="checkbox" v-model="rememberMe" />
           记住我
         </label> -->
-        <!-- <a href="#" class="forgot-password">忘记密码？</a> -->
+        <a href="#" class="forgot-password" @click.prevent="$emit('forgot-password')">忘记密码？</a>
       </div>
 
       <button 
+        v-if="!hideSubmitButton"
         type="submit" 
         class="submit-btn"
         :disabled="loading"
@@ -69,6 +70,14 @@ export default {
     logo: {
       type: String,
       default: ''
+    },
+    hideSubmitButton: {
+      type: Boolean,
+      default: false
+    },
+    isForgotPassword: {
+      type: Boolean,
+      default: false
     }
   },
   data() {

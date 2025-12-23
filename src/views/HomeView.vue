@@ -15,7 +15,12 @@
           @mouseenter="showDropdown = true"
           @mouseleave="handleAvatarLeave"
         >
-          <img :src="displayAvatar" alt="用户头像" @error="handleAvatarError" />
+          <img 
+            :src="displayAvatar" 
+            alt="用户头像" 
+            @error="handleAvatarError"
+            @load="handleAvatarLoad"
+          />
         </div>
         <!-- 下拉菜单 - 独立元素 -->
         <div 
@@ -156,16 +161,31 @@ export default {
     },
     // 显示头像（优先使用用户头像，否则使用默认头像）
     displayAvatar() {
-      if (this.userInfo && this.userInfo.avatar && this.userInfo.avatar !== this.avatarImage) {
+      // 确保avatar存在且不为空字符串
+      if (this.userInfo && 
+          this.userInfo.avatar && 
+          typeof this.userInfo.avatar === 'string' &&
+          this.userInfo.avatar.trim() !== '' && 
+          this.userInfo.avatar !== 'undefined' &&
+          this.userInfo.avatar !== 'null' &&
+          this.userInfo.avatar !== this.avatarImage) {
+        
+        let avatarUrl = this.userInfo.avatar.trim()
+        
         // 如果是相对路径，添加完整URL
-        if (this.userInfo.avatar.startsWith('/')) {
-          return `http://localhost:8090${this.userInfo.avatar}`
+        if (avatarUrl.startsWith('/')) {
+          const fullUrl = `http://localhost:8090${avatarUrl}`
+          console.log('构建头像URL:', fullUrl)
+          return fullUrl
         }
         // 如果已经是完整URL，直接返回
-        if (this.userInfo.avatar.startsWith('http')) {
-          return this.userInfo.avatar
+        if (avatarUrl.startsWith('http')) {
+          console.log('使用完整头像URL:', avatarUrl)
+          return avatarUrl
         }
-        return this.userInfo.avatar
+        // 其他情况，尝试添加基础URL
+        console.warn('未知的头像URL格式:', avatarUrl)
+        return this.avatarImage
       }
       // 默认头像
       return this.avatarImage
@@ -210,27 +230,74 @@ export default {
         const { getCurrentUser } = await import('@/api/user')
         const result = await getCurrentUser()
         
+        console.log('获取用户信息响应:', result)
+        
         if (result.success && result.data) {
-          this.userInfo.avatar = result.data.avatar || null
+          // 确保avatar是有效值，空字符串、undefined、null都设置为null
+          const avatar = result.data.avatar
+          console.log('原始avatar值:', avatar, '类型:', typeof avatar)
+          
+          if (avatar && typeof avatar === 'string' && avatar.trim() !== '' && avatar !== 'undefined' && avatar !== 'null') {
+            this.userInfo.avatar = avatar.trim()
+            console.log('设置头像URL:', this.userInfo.avatar)
+          } else {
+            this.userInfo.avatar = null
+            console.log('头像为空或无效，使用默认头像')
+          }
+          
           this.userInfo.username = result.data.username || '用户'
-          console.log('主页获取用户头像:', this.userInfo.avatar)
         } else {
           // 如果获取失败，使用默认值
+          console.warn('获取用户信息失败，result.success为false')
           this.userInfo.avatar = null
           this.userInfo.username = '用户'
         }
       } catch (error) {
+        // 如果是401未授权错误（token过期），request.js已经处理了跳转，这里静默处理
+        if (error.isUnauthorized || error.status === 401) {
+          console.warn('Token已过期，已自动跳转到登录页')
+          // 清除用户信息，避免显示错误
+          this.userInfo.avatar = null
+          this.userInfo.username = '用户'
+          return
+        }
+        
+        // 其他错误也静默处理，不显示错误信息
         console.error('获取用户信息失败:', error)
-        // 失败时使用默认头像
         this.userInfo.avatar = null
         this.userInfo.username = '用户'
       }
     },
     
+    // 处理头像加载成功
+    handleAvatarLoad(event) {
+      // 头像加载成功，清除默认标记
+      event.target.dataset.isDefault = 'false'
+    },
+    
     // 处理头像加载错误
     handleAvatarError(event) {
-      console.error('头像加载失败，使用默认头像')
-      event.target.src = this.defaultAvatar
+      const failedSrc = event.target.src
+      console.warn('头像加载失败:', failedSrc)
+      
+      // 防止无限循环：如果已经是默认头像还失败，就不再处理
+      if (failedSrc === this.avatarImage || 
+          failedSrc.includes('avatar.png') ||
+          event.target.dataset.isDefault === 'true') {
+        console.warn('默认头像也加载失败，停止处理')
+        // 移除错误处理器，防止无限循环
+        event.target.onerror = null
+        return
+      }
+      
+      // 标记为默认头像，防止再次触发错误
+      event.target.dataset.isDefault = 'true'
+      
+      // 清除无效的头像URL，设置为null，让计算属性返回默认头像
+      this.userInfo.avatar = null
+      
+      // 直接设置默认头像
+      event.target.src = this.avatarImage
     },
     
     // 动态加载海报图片
