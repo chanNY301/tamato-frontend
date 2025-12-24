@@ -230,7 +230,16 @@ export default {
       if (avatar.startsWith('/')) {
         // 无论是开发环境还是生产环境，都使用完整URL
         // 因为图片资源需要通过完整的URL访问
-        const fullUrl = `http://localhost:8090${avatar}`
+        // 注意：如果路径已经是 /api/ 开头，直接拼接；否则需要添加 /api
+        let fullUrl
+        if (avatar.startsWith('/api/')) {
+          // 路径已经是 /api/ 开头，直接拼接基础URL
+          fullUrl = `http://localhost:8090${avatar}`
+        } else {
+          // 路径不是 /api/ 开头，需要添加
+          fullUrl = `http://localhost:8090/api${avatar}`
+        }
+        console.log('构建头像完整URL:', fullUrl, '原始路径:', avatar)
         return fullUrl
       }
       

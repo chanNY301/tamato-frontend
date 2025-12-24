@@ -214,7 +214,7 @@ export default {
     },
     
     goBack() {
-      this.$router.push('/')
+      this.$router.push('/home')
     },
     
     switchNav(navKey) {

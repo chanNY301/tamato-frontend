@@ -122,7 +122,7 @@ export const kickMember = (roomId, userId) => {
 }
 
 // 更新用户状态（专注/休息）
-// 优先调用 /rooms/{roomId}/status，若后端未实现该路径则降级到 /rooms/status
+// 后端使用 PUT /rooms/{roomId}/status
 export const updateUserStatus = async (roomId, statusData) => {
   const token = getToken()
   const config = token ? {
@@ -132,29 +132,17 @@ export const updateUserStatus = async (roomId, statusData) => {
     }
   } : {}
 
-  const primaryUrl = `${BASE_URL}/rooms/${roomId}/status`
-  const fallbackUrl = `${BASE_URL}/rooms/status`
-
-  // 1) 优先 POST rooms/{roomId}/status
-  const primaryRes = await request.post(primaryUrl, statusData, config)
-
-  // request.post 不会在 4xx 时抛错，因此这里显式判断 404 再尝试备用接口
-  if (primaryRes && (primaryRes.status === 404 || primaryRes.code === 404)) {
-    console.warn('rooms/{roomId}/status 返回 404，尝试备用接口 /rooms/status')
-    return request.post(fallbackUrl, { roomId, ...statusData }, config)
+  const url = `${BASE_URL}/rooms/${roomId}/status`
+  
+  console.log('🔄 更新用户状态:', { roomId, statusData, url })
+  
+  try {
+    // 直接使用 PUT 方法（后端接口是 PUT）
+    const response = await request.put(url, statusData, config)
+    console.log('✅ 用户状态更新成功:', response)
+    return response
+  } catch (error) {
+    console.error('❌ 用户状态更新失败:', error)
+    throw error
   }
-
-  // 2) 若返回 405/500 且 message 提示不支持 POST，再尝试 PUT rooms/{roomId}/status
-  const msg = primaryRes?.message || primaryRes?.error || ''
-  if (primaryRes && (primaryRes.status === 405 || primaryRes.code === 405 || /not.*supported/i.test(msg))) {
-    console.warn('rooms/{roomId}/status POST 不被支持，尝试 PUT')
-    const putRes = await request.put(primaryUrl, statusData, config)
-    if (putRes && (putRes.status === 404 || putRes.code === 404)) {
-      console.warn('PUT rooms/{roomId}/status 返回 404，尝试备用接口 /rooms/status')
-      return request.put(fallbackUrl, { roomId, ...statusData }, config)
-    }
-    return putRes
-  }
-
-  return primaryRes
 }

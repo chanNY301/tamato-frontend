@@ -296,30 +296,8 @@ export default {
     // 处理用户状态变化（新方法）
     handleUserStatusChange(status) {
       console.log("番茄钟状态变化:", status);
+      // syncLocalStatus 方法内部已经调用了 updateUserStatusToServer，这里不需要重复调用
       this.syncLocalStatus(status);
-
-      // 同步到后端服务器（这里需要调用你的API）
-      this.syncStatusToServer(status);
-    },
-
-    // 同步状态到服务器
-    async syncStatusToServer(status) {
-      try {
-        // 这里需要调用你的后端API来更新用户状态
-        // 示例：await updateUserStatus(this.roomId, this.currentUserId, status)
-        console.log("正在同步状态到服务器:", {
-          roomId: this.roomId,
-          userId: this.currentUserId,
-          status: status,
-        });
-
-        // 临时模拟：更新当前用户的专注开始时间
-        if (status === "focusing") {
-          this.userStatus.focusStartTime = Date.now();
-        }
-      } catch (error) {
-        console.error("同步状态到服务器失败:", error);
-      }
     },
 
     // 修改 syncLocalStatus 方法
@@ -1096,7 +1074,7 @@ export default {
     },
     
     goToHome() {
-      this.$router.push("/");
+      this.$router.push("/home");
     },
 
     goToJoinRoom() {

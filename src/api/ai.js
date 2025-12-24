@@ -7,14 +7,18 @@ import { API_BASE_URL } from './config'
 /**
  * 与AI对话
  * @param {Array} messages - 消息历史，格式：[{role: 'user'|'assistant', content: '...'}]
+ * @param {Boolean} deductTomato - 是否扣除番茄（默认true，打开聊天时扣除，发送消息时不扣除）
  * @returns {Promise} AI回复
  */
-export const chatWithAI = async (messages) => {
+export const chatWithAI = async (messages, deductTomato = true) => {
   try {
     // 调用后端API（后端会处理大模型API调用）
-    console.log('🚀 调用后端AI接口:', `${API_BASE_URL}/ai/chat`)
+    console.log('🚀 调用后端AI接口:', `${API_BASE_URL}/ai/chat`, '扣除番茄:', deductTomato)
     
-    const response = await request.post(`${API_BASE_URL}/ai/chat`, { messages })
+    const response = await request.post(`${API_BASE_URL}/ai/chat`, { 
+      messages,
+      deductTomato: deductTomato !== false // 默认true，除非明确设置为false
+    })
     
     if (response.success && response.data) {
       console.log('✅ 后端AI接口调用成功')

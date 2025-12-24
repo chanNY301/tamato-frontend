@@ -586,7 +586,7 @@ export default {
 
     // 路由跳转
     goToHome() {
-      this.$router.push('/')
+      this.$router.push('/home')
     },
 
     goToCreateRoom() {

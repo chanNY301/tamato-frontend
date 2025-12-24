@@ -71,6 +71,12 @@ export const getCurrentMonthCheckInDates = async () => {
   return request.get(`${API_BASE_URL}/me/checkin/dates`)
 }
 
+// 补签功能
+export const makeupCheckIn = async (date) => {
+  // date格式: 'YYYY-MM-DD'
+  return request.post(`${API_BASE_URL}/me/checkin/makeup?date=${encodeURIComponent(date)}`, null)
+}
+
 // 结束专注
 export const stopFocus = async () => {
   return request.post(`${API_BASE_URL}/focus/stop`)

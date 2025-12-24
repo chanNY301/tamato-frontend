@@ -290,6 +290,10 @@ export default {
           // 注册成功，显示提示信息并跳转到登录页面
           this.successMessage = '注册成功！请使用您的账号登录'
           
+          // 显示获得50个番茄的通知
+          const { showEarnTomatoNotification } = await import('@/utils/tomatoNotification')
+          showEarnTomatoNotification(50, '欢迎加入！注册奖励')
+          
           setTimeout(() => {
             // 跳转到登录页面，并传递注册成功的提示
             this.$router.push({
