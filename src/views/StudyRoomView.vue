@@ -104,6 +104,12 @@
               @user-status-change="handleUserStatusChange"
             />
 
+          <!-- 直接使用音乐播放器 -->
+          <MusicPlayerSimple 
+            v-if="roomInfo.music_name && roomInfo.music_name !== '无'"
+            :musicName="roomInfo.music_name"
+          />
+
             <!-- 用户状态控制 -->
             <div class="user-status-section">
               <h3>我的状态</h3>
@@ -209,11 +215,13 @@ import {
 } from "@/api/studyRooms";
 import PomodoroTimer from "@/components/PomodoroTimer/PomodoroTimer.vue";
 import { getCurrentUser } from "@/api/user";
+import MusicPlayerSimple from "@/components/MusicPlayerSimple/MusicPlayerSimple.vue";
 
 export default {
   name: "StudyRoomView",
   components: {
     PomodoroTimer,
+    MusicPlayerSimple,
   },
   data() {
     return {
