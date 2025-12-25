@@ -1,5 +1,6 @@
 // 使用 fetch 替代 axios
-import { getToken } from './config'
+import { getToken, removeToken } from './config'
+import router from '@/router'
 
 // 构建请求头
 const buildHeaders = (includeAuth = true) => {
@@ -36,17 +37,73 @@ const request = {
       if (contentType && contentType.includes('application/json')) {
         try {
           result = await response.json()
-          // 如果响应是 JSON 格式，直接返回，让调用方根据 result.success 来判断
-          // 无论 HTTP 状态码是什么，都返回解析后的 JSON
+          // 如果响应是 JSON 格式，检查HTTP状态码
+          // 如果状态码表示错误，检查JSON中是否有success字段
+          if (!response.ok) {
+            // 如果是401错误，特殊处理
+            if (response.status === 401) {
+              console.warn('⚠️ Token已过期或无效，清除token并跳转到登录页')
+              removeToken()
+              const currentPath = router.currentRoute.value.path
+              // 只有在非登录/注册/忘记密码页面时才跳转到登录页
+              // 避免在跳转到/home时被立即重定向
+              if (currentPath !== '/login' && currentPath !== '/register' && currentPath !== '/forgot-password') {
+                // 使用nextTick延迟跳转，避免覆盖正在进行的路由跳转
+                setTimeout(() => {
+                  if (router.currentRoute.value.path !== '/login') {
+                    router.push('/login')
+                  }
+                }, 100)
+              }
+              const error = new Error('登录已过期，请重新登录')
+              error.status = 401
+              error.isUnauthorized = true
+              error.response = response
+              throw error
+            }
+            // 其他错误，从JSON中提取错误消息
+            const errorMessage = result.message || result.error || `请求失败: ${response.status}`
+            const error = new Error(errorMessage)
+            error.status = response.status
+            error.response = response
+            error.data = result
+            throw error
+          }
+          // 如果成功，直接返回JSON
           console.log('📦 收到响应:', result)
           return result
         } catch (e) {
+          // 如果已经是我们抛出的错误，直接抛出
+          if (e.status || e.isUnauthorized) {
+            throw e
+          }
           // JSON 解析失败，继续使用文本方式
           console.error('JSON 解析失败:', e)
         }
       }
       
       if (!response.ok) {
+        // 处理 401 未授权错误（token过期或无效）
+        if (response.status === 401) {
+          console.warn('⚠️ Token已过期或无效，清除token并跳转到登录页')
+          removeToken()
+          const currentPath = router.currentRoute.value.path
+          // 只有在非登录/注册/忘记密码页面时才跳转到登录页
+          if (currentPath !== '/login' && currentPath !== '/register' && currentPath !== '/forgot-password') {
+            // 使用setTimeout延迟跳转，避免覆盖正在进行的路由跳转
+            setTimeout(() => {
+              if (router.currentRoute.value.path !== '/login') {
+                router.push('/login')
+              }
+            }, 100)
+          }
+          const error = new Error('登录已过期，请重新登录')
+          error.status = 401
+          error.isUnauthorized = true
+          error.response = response
+          throw error
+        }
+        
         let errorText = ''
         try {
           errorText = await response.text()
@@ -94,6 +151,26 @@ const request = {
       if (contentType && contentType.includes('application/json')) {
         try {
           result = await response.json()
+          // 如果是401错误，处理token过期
+          if (response.status === 401) {
+            console.warn('⚠️ Token已过期或无效，清除token并跳转到登录页')
+            removeToken()
+            const currentPath = router.currentRoute.value.path
+            // 只有在非登录/注册/忘记密码页面时才跳转到登录页
+            if (currentPath !== '/login' && currentPath !== '/register' && currentPath !== '/forgot-password') {
+              // 使用setTimeout延迟跳转，避免覆盖正在进行的路由跳转
+              setTimeout(() => {
+                if (router.currentRoute.value.path !== '/login') {
+                  router.push('/login')
+                }
+              }, 100)
+            }
+            const error = new Error('登录已过期，请重新登录')
+            error.status = 401
+            error.isUnauthorized = true
+            error.response = response
+            throw error
+          }
           // 如果是404错误，返回错误信息
           if (response.status === 404) {
             const error = new Error(result.message || '用户不存在')
@@ -107,12 +184,37 @@ const request = {
             return result
           }
         } catch (e) {
+          // 如果已经是我们抛出的错误，直接抛出
+          if (e.isUnauthorized || e.status === 401) {
+            throw e
+          }
           // JSON 解析失败，继续使用文本方式
           console.error('JSON 解析失败:', e)
         }
       }
       
       if (!response.ok) {
+        // 处理 401 未授权错误（token过期或无效）
+        if (response.status === 401) {
+          console.warn('⚠️ Token已过期或无效，清除token并跳转到登录页')
+          removeToken()
+          const currentPath = router.currentRoute.value.path
+          // 只有在非登录/注册/忘记密码页面时才跳转到登录页
+          if (currentPath !== '/login' && currentPath !== '/register' && currentPath !== '/forgot-password') {
+            // 使用setTimeout延迟跳转，避免覆盖正在进行的路由跳转
+            setTimeout(() => {
+              if (router.currentRoute.value.path !== '/login') {
+                router.push('/login')
+              }
+            }, 100)
+          }
+          const error = new Error('登录已过期，请重新登录')
+          error.status = 401
+          error.isUnauthorized = true
+          error.response = response
+          throw error
+        }
+        
         let errorText = ''
         try {
           errorText = await response.text()
@@ -163,6 +265,27 @@ const request = {
       })
       
       if (!response.ok) {
+        // 处理 401 未授权错误（token过期或无效）
+        if (response.status === 401) {
+          console.warn('⚠️ Token已过期或无效，清除token并跳转到登录页')
+          removeToken()
+          const currentPath = router.currentRoute.value.path
+          // 只有在非登录/注册/忘记密码页面时才跳转到登录页
+          if (currentPath !== '/login' && currentPath !== '/register' && currentPath !== '/forgot-password') {
+            // 使用setTimeout延迟跳转，避免覆盖正在进行的路由跳转
+            setTimeout(() => {
+              if (router.currentRoute.value.path !== '/login') {
+                router.push('/login')
+              }
+            }, 100)
+          }
+          const error = new Error('登录已过期，请重新登录')
+          error.status = 401
+          error.isUnauthorized = true
+          error.response = response
+          throw error
+        }
+        
         const errorText = await response.text()
         console.error('❌ PUT请求失败:', response.status, errorText)
         throw new Error(`请求失败: ${response.status} ${errorText}`)
@@ -196,6 +319,27 @@ const request = {
       const response = await fetch(url, fetchOptions)
       
       if (!response.ok) {
+        // 处理 401 未授权错误（token过期或无效）
+        if (response.status === 401) {
+          console.warn('⚠️ Token已过期或无效，清除token并跳转到登录页')
+          removeToken()
+          const currentPath = router.currentRoute.value.path
+          // 只有在非登录/注册/忘记密码页面时才跳转到登录页
+          if (currentPath !== '/login' && currentPath !== '/register' && currentPath !== '/forgot-password') {
+            // 使用setTimeout延迟跳转，避免覆盖正在进行的路由跳转
+            setTimeout(() => {
+              if (router.currentRoute.value.path !== '/login') {
+                router.push('/login')
+              }
+            }, 100)
+          }
+          const error = new Error('登录已过期，请重新登录')
+          error.status = 401
+          error.isUnauthorized = true
+          error.response = response
+          throw error
+        }
+        
         const errorText = await response.text()
         console.error('❌ DELETE请求失败:', response.status, errorText)
         throw new Error(`请求失败: ${response.status} ${errorText}`)

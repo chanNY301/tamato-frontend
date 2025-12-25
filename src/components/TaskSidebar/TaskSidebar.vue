@@ -186,6 +186,12 @@ export default {
         // 重新加载任务列表
         await this.loadTasks()
         
+        // 如果任务刚刚完成，显示获得番茄的通知
+        if (newStatus === '已完成' && (currentStatus === '进行中' || currentStatus === '未完成' || currentStatus === '未开始')) {
+          const { showEarnTomatoNotification } = await import('@/utils/tomatoNotification')
+          showEarnTomatoNotification(1, '任务完成奖励！继续加油哦！')
+        }
+        
         // 触发事件通知父组件
         this.$emit('task-status-changed', {
           taskId: taskId,

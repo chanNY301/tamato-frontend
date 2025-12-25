@@ -27,7 +27,30 @@
             placeholder="请输入您的邮箱"
             required
             :error="errors.email"
+            @blur="handleEmailBlur"
           />
+          
+          <!-- 验证码输入 -->
+          <div class="verification-code-group">
+            <FormInput
+              v-model="formData.verificationCode"
+              type="text"
+              label="验证码"
+              placeholder="请输入邮箱验证码"
+              required
+              :error="errors.verificationCode"
+            />
+            <button
+              type="button"
+              class="send-code-btn"
+              :disabled="!canSendCode || sendingCode || countdown > 0"
+              @click="sendVerificationCode"
+            >
+              <span v-if="countdown > 0">{{ countdown }}秒后重试</span>
+              <span v-else-if="sendingCode">发送中...</span>
+              <span v-else>发送验证码</span>
+            </button>
+          </div>
           
           <FormInput
             v-model="formData.password"
@@ -73,15 +96,31 @@ export default {
         username: '',
         email: '',
         password: '',
-        confirmPassword: ''
+        confirmPassword: '',
+        verificationCode: ''
       },
       errors: {
         username: '',
         email: '',
         password: '',
-        confirmPassword: ''
+        confirmPassword: '',
+        verificationCode: ''
       },
+      canSendCode: false,
+      sendingCode: false,
+      countdown: 0,
       logoUrl: require('@/assets/logo.png')
+    }
+  },
+  watch: {
+    // 监听邮箱输入，实时验证
+    'formData.email'(newVal) {
+      if (newVal && this.isValidEmail(newVal)) {
+        this.canSendCode = true
+        this.errors.email = ''
+      } else {
+        this.canSendCode = false
+      }
     }
   },
   methods: {
@@ -130,12 +169,94 @@ export default {
         isValid = false
       }
 
+      // 验证码验证
+      if (!this.formData.verificationCode) {
+        this.errors.verificationCode = '请输入验证码'
+        isValid = false
+      } else if (this.formData.verificationCode.length !== 6) {
+        this.errors.verificationCode = '验证码应为6位数字'
+        isValid = false
+      }
+
       return isValid
     },
 
     isValidEmail(email) {
-      const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
+      // 支持所有常见邮箱格式，包括QQ邮箱（数字@qq.com 或 自定义@qq.com）
+      const emailRegex = /^[A-Za-z0-9]+([._-][A-Za-z0-9]+)*@([A-Za-z0-9]+[-]?[A-Za-z0-9]+\.)+[A-Za-z]{2,}$/
       return emailRegex.test(email)
+    },
+
+    handleEmailInput() {
+      // 实时检查邮箱格式，允许发送验证码
+      if (this.isValidEmail(this.formData.email)) {
+        this.canSendCode = true
+        this.errors.email = ''
+      } else {
+        this.canSendCode = false
+      }
+    },
+
+    handleEmailBlur() {
+      // 当邮箱输入框失去焦点时，再次验证
+      if (this.isValidEmail(this.formData.email)) {
+        this.canSendCode = true
+        this.errors.email = ''
+      } else {
+        this.canSendCode = false
+        if (this.formData.email) {
+          this.errors.email = '请输入有效的邮箱地址'
+        }
+      }
+    },
+
+    async sendVerificationCode() {
+      if (!this.isValidEmail(this.formData.email)) {
+        this.errors.email = '请输入有效的邮箱地址'
+        return
+      }
+
+      if (this.countdown > 0 || this.sendingCode) {
+        return
+      }
+
+      this.sendingCode = true
+      this.errors.email = ''
+
+      try {
+        const { sendVerificationCode } = await import('@/api/auth')
+        const result = await sendVerificationCode(this.formData.email)
+        
+        if (result.success) {
+          // 开始倒计时
+          this.countdown = 60
+          const timer = setInterval(() => {
+            this.countdown--
+            if (this.countdown <= 0) {
+              clearInterval(timer)
+            }
+          }, 1000)
+          // 显示成功提示
+          this.successMessage = '验证码已发送！请查看您的邮箱（开发环境请查看后端控制台日志）'
+          setTimeout(() => {
+            this.successMessage = ''
+          }, 5000)
+        } else {
+          this.errors.email = result.message || '发送验证码失败，请重试'
+        }
+      } catch (err) {
+        console.error('发送验证码失败:', err)
+        // 检查错误响应
+        if (err.result && err.result.message) {
+          this.errors.email = err.result.message
+        } else if (err.isNetworkError) {
+          this.errors.email = '无法连接到服务器，请确保后端服务正在运行'
+        } else {
+          this.errors.email = err.message || '发送验证码失败，请检查网络连接'
+        }
+      } finally {
+        this.sendingCode = false
+      }
     },
 
     async handleRegister() {
@@ -156,7 +277,9 @@ export default {
         const result = await register(
           this.formData.username,
           this.formData.email,
-          this.formData.password
+          this.formData.password,
+          null,
+          this.formData.verificationCode
         )
 
         // 清除之前的错误和成功消息
@@ -166,6 +289,10 @@ export default {
         if (result && result.success) {
           // 注册成功，显示提示信息并跳转到登录页面
           this.successMessage = '注册成功！请使用您的账号登录'
+          
+          // 显示获得50个番茄的通知
+          const { showEarnTomatoNotification } = await import('@/utils/tomatoNotification')
+          showEarnTomatoNotification(50, '欢迎加入！注册奖励')
           
           setTimeout(() => {
             // 跳转到登录页面，并传递注册成功的提示
@@ -226,5 +353,34 @@ export default {
 .register-container {
   width: 100%;
   max-width: 400px;
+}
+
+.verification-code-group {
+  position: relative;
+  margin-bottom: 1.5rem;
+}
+
+.send-code-btn {
+  position: absolute;
+  right: 8px;
+  top: 38px;
+  padding: 8px 16px;
+  background: #cc2a1f;
+  color: white;
+  border: none;
+  border-radius: 6px;
+  font-size: 0.85rem;
+  cursor: pointer;
+  transition: background 0.3s ease;
+  white-space: nowrap;
+}
+
+.send-code-btn:hover:not(:disabled) {
+  background: #7f180f;
+}
+
+.send-code-btn:disabled {
+  background: #ccc;
+  cursor: not-allowed;
 }
 </style>

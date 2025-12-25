@@ -21,7 +21,7 @@ export const login = async (username, password) => {
 }
 
 // 注册
-export const register = async (username, email, password, phone = null) => {
+export const register = async (username, email, password, phone = null, verificationCode = null) => {
   const requestData = {
     username: username,
     email: email,
@@ -33,6 +33,11 @@ export const register = async (username, email, password, phone = null) => {
     requestData.phone = phone.trim()
   }
   
+  // 添加验证码
+  if (verificationCode) {
+    requestData.verificationCode = verificationCode
+  }
+  
   const response = await request.post(
     `${API_BASE_URL}/auth/register`,
     requestData,
@@ -41,6 +46,43 @@ export const register = async (username, email, password, phone = null) => {
   
   // 注册成功后不自动保存token，让用户手动登录
   // 这样用户可以在登录页面看到注册成功的提示
+  
+  return response
+}
+
+// 发送验证码
+export const sendVerificationCode = async (email) => {
+  const response = await request.post(
+    `${API_BASE_URL}/auth/send-verification-code`,
+    { email: email },
+    { includeAuth: false } // 发送验证码接口不需要token
+  )
+  
+  return response
+}
+
+// 发送重置密码验证码
+export const sendResetPasswordCode = async (email) => {
+  const response = await request.post(
+    `${API_BASE_URL}/auth/send-reset-password-code`,
+    { email: email },
+    { includeAuth: false } // 发送验证码接口不需要token
+  )
+  
+  return response
+}
+
+// 重置密码
+export const resetPassword = async (email, verificationCode, newPassword) => {
+  const response = await request.post(
+    `${API_BASE_URL}/auth/reset-password`,
+    {
+      email: email,
+      verificationCode: verificationCode,
+      newPassword: newPassword
+    },
+    { includeAuth: false } // 重置密码接口不需要token
+  )
   
   return response
 }

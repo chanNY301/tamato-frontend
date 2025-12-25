@@ -113,29 +113,22 @@ export default {
     // 获取头像URL（处理相对路径和默认头像）
     getAvatarUrl(avatar) {
       if (!avatar) {
-        console.log('没有头像URL，使用默认头像')
         return this.avatarImage
       }
       
       // 如果是data URL，直接返回
       if (avatar.startsWith('data:')) {
-        console.log('使用data URL头像')
         return avatar
       }
       
       // 如果已经是完整URL，直接返回
       if (avatar.startsWith('http://') || avatar.startsWith('https://')) {
-        console.log('使用完整URL头像:', avatar)
         return avatar
       }
       
       // 如果是相对路径，转换为完整URL
       if (avatar.startsWith('/')) {
-        // 无论是开发环境还是生产环境，都使用完整URL
-        // 因为图片资源需要通过完整的URL访问，代理可能无法正确处理图片请求
-        const fullUrl = `http://localhost:8090${avatar}`
-        console.log('头像URL（完整路径）:', fullUrl)
-        return fullUrl
+        return `http://localhost:8090${avatar}`
       }
       
       // 其他情况返回默认头像
@@ -144,7 +137,6 @@ export default {
     
     // 处理左侧头像加载错误
     handleSidebarAvatarError(event) {
-      console.error('左侧头像加载失败，URL:', event.target.src)
       // 如果加载失败，使用默认头像
       if (!event.target.src.includes('avatar.png')) {
         event.target.src = this.avatarImage
@@ -222,7 +214,7 @@ export default {
     },
     
     goBack() {
-      this.$router.push('/')
+      this.$router.push('/home')
     },
     
     switchNav(navKey) {

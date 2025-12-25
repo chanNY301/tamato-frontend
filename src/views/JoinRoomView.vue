@@ -323,7 +323,7 @@ export default {
     },
     
     goToHome() {
-      this.$router.push('/')
+      this.$router.push('/home')
     }
   }
 }

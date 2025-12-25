@@ -83,13 +83,64 @@ export default {
       messages: [],
       inputMessage: '',
       isLoading: false,
-      inputRef: null
+      inputRef: null,
+      tomatoDeducted: false // 标记是否已经扣除过番茄
     }
   },
   watch: {
-    visible(newVal) {
+    async visible(newVal) {
       if (newVal) {
-        // 对话框打开时，添加欢迎消息
+        // 重置扣除标记
+        this.tomatoDeducted = false
+        
+        // 对话框打开时，先调用一次AI聊天API来扣除1个番茄
+        try {
+          // 调用AI聊天API来触发扣除番茄（发送一条系统消息）
+          // 这样会触发后端的扣除逻辑
+          const systemMessage = {
+            role: 'user',
+            content: '开启聊天'
+          }
+          
+          try {
+            // 调用API，这会触发后端的扣除逻辑（deductTomato=true）
+            await chatWithAI([systemMessage], true)
+            // 标记已经扣除过番茄
+            this.tomatoDeducted = true
+            
+            // API调用成功后，显示通知
+            const { showSpendTomatoNotification } = await import('@/utils/tomatoNotification')
+            showSpendTomatoNotification(1, '开启聊天功能')
+            
+            // 不将系统消息添加到消息列表，只用于触发扣除
+          } catch (error) {
+            console.error('扣除番茄失败:', error)
+            // 如果扣除失败（比如番茄不足），显示错误提示
+            if (error.message && (error.message.includes('番茄不足') || error.message.includes('番茄'))) {
+              this.messages.push({
+                role: 'assistant',
+                content: '番茄不足，无法使用聊天功能。请先完成任务或签到获得番茄！',
+                timestamp: new Date()
+              })
+              // 延迟关闭对话框
+              setTimeout(() => {
+                this.closeDialog()
+              }, 2000)
+              return
+            }
+            // 其他错误也显示通知（即使扣除失败，也告知用户）
+            try {
+              const { showSpendTomatoNotification } = await import('@/utils/tomatoNotification')
+              showSpendTomatoNotification(1, '扣除失败，请重试')
+            } catch (notifError) {
+              console.error('显示通知失败:', notifError)
+            }
+          }
+        } catch (error) {
+          console.error('初始化聊天失败:', error)
+        }
+        
+        // 添加欢迎消息
         this.addWelcomeMessage()
         // 聚焦输入框
         this.$nextTick(() => {
@@ -97,6 +148,9 @@ export default {
             this.$refs.inputRef.focus()
           }
         })
+      } else {
+        // 对话框关闭时，重置扣除标记
+        this.tomatoDeducted = false
       }
     },
     messages: {
@@ -156,8 +210,8 @@ export default {
       this.isLoading = true
       
       try {
-        // 调用AI API
-        const response = await chatWithAI(this.messages)
+        // 调用AI API（不扣除番茄，因为打开时已经扣除过了）
+        const response = await chatWithAI(this.messages, false)
         
         // 添加AI回复
         this.messages.push({

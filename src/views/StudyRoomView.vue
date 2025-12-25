@@ -14,7 +14,6 @@
           解散自习室
         </button>
         <button v-else @click="leaveRoom" class="nav-link">退出房间</button>
-        <button @click="goToHome" class="nav-link">返回首页</button>
       </div>
     </nav>
 
@@ -35,10 +34,7 @@
             房间ID <strong>{{ roomId }}</strong> 不存在或已关闭
           </p>
           <div class="not-found-actions">
-            <button @click="goToHome" class="action-btn primary-btn">
-              返回首页
-            </button>
-            <button @click="goToJoinRoom" class="action-btn secondary-btn">
+            <button @click="goToJoinRoom" class="action-btn primary-btn">
               加入其他自习室
             </button>
           </div>
@@ -96,15 +92,15 @@
         <div class="room-layout">
           <!-- 左侧：番茄钟和工作区 -->
           <div class="left-section">
-            <PomodoroTimer
+              <PomodoroTimer
               class="timer-component"
-              :key="roomId"
+                :key="roomId"
               @timer-started="handleTimerStart"
               @timer-paused="handleTimerPause"
               @timer-resumed="handleTimerResume"
               @timer-stopped="handleTimerStop"
-              @focus-completed="handleFocusCompleted"
-              @break-skipped="handleBreakSkipped"
+                @focus-completed="handleFocusCompleted"
+                @break-skipped="handleBreakSkipped"
               @user-status-change="handleUserStatusChange"
             />
 
@@ -246,7 +242,8 @@ export default {
       focusTimer: null,
       lastRefreshTime: null,
       refreshTimer: null,
-      refreshInterval: 5000,
+      isUpdatingStatus: false, // 标志：正在更新状态，防止loadMembersData干扰
+      refreshInterval: 10000, // 改为10秒刷新一次，减少服务器压力
     };
   },
   computed: {
@@ -283,8 +280,8 @@ export default {
       handler(newRoomId) {
         if (newRoomId) {
           this.validateAndLoadRoom();
-        }
-      },
+      }
+    },
     },
     "userStatus.isFocusing"(newVal, oldVal) {
       if (newVal !== oldVal) {
@@ -299,36 +296,17 @@ export default {
     // 处理用户状态变化（新方法）
     handleUserStatusChange(status) {
       console.log("番茄钟状态变化:", status);
+      // syncLocalStatus 方法内部已经调用了 updateUserStatusToServer，这里不需要重复调用
       this.syncLocalStatus(status);
-
-      // 同步到后端服务器（这里需要调用你的API）
-      this.syncStatusToServer(status);
-    },
-
-    // 同步状态到服务器
-    async syncStatusToServer(status) {
-      try {
-        // 这里需要调用你的后端API来更新用户状态
-        // 示例：await updateUserStatus(this.roomId, this.currentUserId, status)
-        console.log("正在同步状态到服务器:", {
-          roomId: this.roomId,
-          userId: this.currentUserId,
-          status: status,
-        });
-
-        // 临时模拟：更新当前用户的专注开始时间
-        if (status === "focusing") {
-          this.userStatus.focusStartTime = Date.now();
-        }
-      } catch (error) {
-        console.error("同步状态到服务器失败:", error);
-      }
     },
 
     // 修改 syncLocalStatus 方法
     syncLocalStatus(status) {
       const isFocus = status === "focusing";
       const wasFocusing = this.userStatus.isFocusing;
+
+      // 设置状态更新标志，防止loadMembersData干扰
+      this.isUpdatingStatus = true;
 
       this.hasStartedFocus = isFocus;
       // 同步"我的状态"展示
@@ -346,15 +324,18 @@ export default {
       // 同步右侧成员列表
       this.updateMemberStatusLocally(status);
 
-      // 同步到服务器
-      this.updateUserStatusToServer();
-
-      // 主动拉取一次以获取后端状态（确保其他用户能看到更新）
-      this.loadMembersData().catch((err) =>
-        console.error("刷新成员列表失败:", err)
-      );
+      // 同步到服务器（异步，不阻塞）
+      this.updateUserStatusToServer().finally(() => {
+        // 状态更新完成后，延迟清除标志并刷新成员列表
+        setTimeout(() => {
+          this.isUpdatingStatus = false;
+          // 主动拉取一次以获取后端状态（确保其他用户能看到更新）
+          this.loadMembersData().catch((err) =>
+            console.error("刷新成员列表失败:", err)
+          );
+        }, 500); // 延迟500ms确保服务器状态已更新
+      });
     },
-
 
     // 加载当前用户信息
     async loadCurrentUser() {
@@ -397,7 +378,7 @@ export default {
           (response.success === true || response.success === "true")
         ) {
           console.log("房间验证成功");
-
+          
           if (response.data) {
             this.roomInfo = {
               room_id:
@@ -415,12 +396,12 @@ export default {
               music_name:
                 response.data.musicName || response.data.music_name || "无",
             };
-
+            
             console.log("房间信息:", this.roomInfo);
-
+            
             // 加载成员列表（loadMembersData 内部会调用 checkIfRoomOwner）
             await this.loadMembersData();
-
+            
             console.log("房间数据加载完成");
           } else {
             console.log("房间数据为空，视为不存在");
@@ -484,13 +465,9 @@ export default {
           list.length
         ) {
           const currentIdStr = this.normalizedCurrentUserId;
-          console.log(
-            "当前用户ID（用于匹配）:",
-            currentIdStr,
-            "类型:",
-            typeof currentIdStr
-          );
-          console.log("成员列表原始数据:", list);
+          // 减少日志输出，提升性能
+          // console.log("当前用户ID（用于匹配）:", currentIdStr, "类型:", typeof currentIdStr);
+          // console.log("成员列表原始数据:", list);
 
           this.members = list.map((member) => {
             // ✅ 兼容多种ID字段：userId, user_id, id（注意：API返回的是 userId）
@@ -502,17 +479,8 @@ export default {
               memberIdStr !== null &&
               memberIdStr === currentIdStr;
 
-            console.log("处理成员:", {
-              rawId: rawId,
-              memberIdStr: memberIdStr,
-              currentIdStr: currentIdStr,
-              isCurrentUser: isCurrentUser,
-              role: member.role,
-              username: member.username || member.name,
-              "member.userId": member.userId,
-              "member.user_id": member.user_id,
-              "member.id": member.id,
-            });
+            // 减少日志输出，提升性能
+            // console.log("处理成员:", {...});
 
             // 兼容不同字段的状态表示
             const rawStatus =
@@ -544,7 +512,19 @@ export default {
               // 否则保持后端返回的状态
               // this.hasStartedFocus 会在番茄钟开始时被设置为 true
             }
-
+            
+            // 计算专注时间（如果是当前用户且状态是专注中，使用本地计时；否则使用计算值）
+            let focusTimeValue = "";
+            if (normalizedStatus === "focusing") {
+              if (isCurrentUser && this.userStatus.isFocusing && this.userStatus.focusTime) {
+                // 当前用户使用本地计时器的时间
+                focusTimeValue = this.userStatus.focusTime;
+              } else {
+                // 其他成员或初始加载时使用计算值
+                focusTimeValue = this.calculateFocusTime(member);
+              }
+            }
+            
             return {
               id: rawId,
               user_id: rawId,
@@ -553,39 +533,65 @@ export default {
               username: member.username || member.name || "",
               role: member.role,
               status: normalizedStatus,
-              focusTime:
-                normalizedStatus === "focusing"
-                  ? this.calculateFocusTime(member)
-                  : "",
+              focusTime: focusTimeValue,
               restTime: normalizedStatus === "resting" ? "休息中" : "",
               joined_at: member.joined_at,
               isCurrentUser: isCurrentUser,
             };
           });
 
-          // 更新当前用户状态
+          // 更新当前用户状态 - 以数据库状态为准
           const currentMember = this.members.find((m) => m.isCurrentUser);
           if (currentMember) {
             const serverStatus = currentMember.status === "focusing";
-            // 如果服务器状态与本地状态不一致，且本地已经开始了专注，以本地为准
-            if (
-              this.hasStartedFocus &&
-              this.userStatus.isFocusing !== serverStatus
-            ) {
-              console.log("服务器状态与本地不一致，以本地状态为准:", {
-                本地: this.userStatus.isFocusing ? "focusing" : "resting",
-                服务器: serverStatus ? "focusing" : "resting",
-              });
-              // 同步本地状态到服务器
-              this.updateUserStatusToServer();
-            } else {
-              // 否则以服务器状态为准（适用于刚进入房间时）
-              this.userStatus.isFocusing = serverStatus;
-              if (serverStatus && !this.userStatus.focusStartTime) {
-                this.userStatus.focusStartTime = Date.now();
+            
+            // 以数据库状态为准，同步到本地状态
+            console.log("从数据库同步状态:", {
+              数据库状态: currentMember.status,
+              serverStatus: serverStatus,
+              当前本地状态: this.userStatus.isFocusing ? "focusing" : "resting"
+            });
+            
+            // 同步"我的状态"到数据库状态
+            this.userStatus.isFocusing = serverStatus;
+            
+            // 如果正在更新状态，不要干扰本地状态
+            if (this.isUpdatingStatus) {
+              console.log("正在更新状态，跳过服务器状态同步");
+              return;
+            }
+
+            // 如果数据库状态是"专注中"，需要启动或恢复计时器
+            if (serverStatus) {
+              // 如果之前没有开始计时，或者计时器没有运行，启动计时器
+              // 注意：不要重置已存在的focusStartTime，避免计时器偏快
+              if (!this.focusTimer) {
+                // 只有在计时器不存在时才启动
+                // 如果focusStartTime已存在，说明是本地已开始的计时，保持原值
+                // 如果focusStartTime不存在，说明是首次从服务器同步，从当前时间开始
+                if (!this.userStatus.focusStartTime) {
+                  this.userStatus.focusStartTime = Date.now();
+                }
                 this.startFocusTimer();
               }
+              // 更新成员列表中的focusTime（使用本地计算的focusTime）
+              if (this.userStatus.focusTime) {
+                currentMember.focusTime = this.userStatus.focusTime;
+              }
+              currentMember.restTime = "";
+            } else {
+              // 如果数据库状态是"休息中"，停止计时器
+              if (this.focusTimer) {
+                this.stopFocusTimer();
+              }
+              // 更新成员列表
+              currentMember.focusTime = "";
+              currentMember.restTime = "休息中";
             }
+            
+            // 如果本地状态与数据库状态不一致（比如用户手动操作后），需要同步到数据库
+            // 但这里我们以数据库为准，所以不需要这个逻辑
+            // 如果用户通过番茄钟操作改变了状态，会在 handleTimerStart/Stop 中同步到数据库
             console.log("当前用户信息:", {
               id: currentMember.id,
               name: currentMember.name,
@@ -593,7 +599,7 @@ export default {
               isCurrentUser: currentMember.isCurrentUser,
               status: currentMember.status,
             });
-          } else {
+        } else {
             console.warn("⚠️ 当前用户不在成员列表中");
             console.log(
               "成员列表:",
@@ -661,7 +667,7 @@ export default {
 
     calculateFocusTime(member) {
       if (member.status !== "focusing") return "";
-
+      
       if (member.focus_start_time) {
         const startTime = new Date(member.focus_start_time).getTime();
         const now = Date.now();
@@ -763,7 +769,7 @@ export default {
       const status = this.userStatus.isFocusing ? "focusing" : "resting";
       const statusData = {
         userId: this.currentUserId,
-        status: status,
+          status: status,
         isFocusing: this.userStatus.isFocusing,
         focusStartTime:
           this.userStatus.isFocusing && this.userStatus.focusStartTime
@@ -783,14 +789,34 @@ export default {
     },
 
     startFocusTimer() {
-      this.userStatus.focusStartTime = Date.now();
-
+      // 如果是从暂停恢复，需要加上之前已经经过的时间
+      if (this.userStatus.isPaused && this.userStatus.pausedElapsed > 0) {
+        this.userStatus.focusStartTime = Date.now() - this.userStatus.pausedElapsed;
+        this.userStatus.isPaused = false;
+        this.userStatus.pausedElapsed = 0;
+      } else if (!this.userStatus.focusStartTime) {
+        // 新开始专注，只有在focusStartTime不存在时才设置
+        // 这样可以防止loadMembersData重置focusStartTime导致计时器偏快
+        this.userStatus.focusStartTime = Date.now();
+        this.userStatus.pausedElapsed = 0;
+      }
+      // 如果focusStartTime已存在且不是暂停恢复，保持原值不变
+      
+      // 先清除旧的计时器，避免重复
       if (this.focusTimer) {
         clearInterval(this.focusTimer);
+        this.focusTimer = null;
       }
-
+      
+      // 立即更新一次显示，避免延迟
+      if (this.userStatus.isFocusing && this.userStatus.focusStartTime) {
+        const elapsed = Date.now() - this.userStatus.focusStartTime;
+        this.userStatus.focusTime = this.formatTime(elapsed);
+      }
+      
+      // 设置定时器，每秒更新一次
       this.focusTimer = setInterval(() => {
-        if (this.userStatus.isFocusing) {
+        if (this.userStatus.isFocusing && !this.userStatus.isPaused && this.userStatus.focusStartTime) {
           const elapsed = Date.now() - this.userStatus.focusStartTime;
           this.userStatus.focusTime = this.formatTime(elapsed);
 
@@ -799,17 +825,62 @@ export default {
           );
           if (currentMember) {
             currentMember.focusTime = this.userStatus.focusTime;
+            // 确保状态一致
+            if (currentMember.status !== "focusing") {
+              currentMember.status = "focusing";
+            }
           }
         }
       }, 1000);
     },
 
+    pauseFocusTimer() {
+      if (this.focusTimer) {
+        clearInterval(this.focusTimer);
+        this.focusTimer = null;
+      }
+
+      // 记录暂停时已经经过的时间
+      if (this.userStatus.focusStartTime) {
+        this.userStatus.pausedElapsed = Date.now() - this.userStatus.focusStartTime;
+        this.userStatus.isPaused = true;
+      }
+    },
+
+    resumeFocusTimer() {
+      // 恢复计时器
+      this.startFocusTimer();
+    },
+
     stopFocusTimer() {
+      // 设置状态更新标志，防止loadMembersData重新启动计时器
+      this.isUpdatingStatus = true;
+      
       if (this.focusTimer) {
         clearInterval(this.focusTimer);
         this.focusTimer = null;
       }
       this.userStatus.focusTime = "00:00:00";
+      this.userStatus.focusStartTime = null;
+      this.userStatus.isPaused = false;
+      this.userStatus.pausedElapsed = 0;
+      
+      // 同步更新成员列表中的状态
+      const currentMember = this.members.find(
+        (member) => member.isCurrentUser
+      );
+      if (currentMember) {
+        currentMember.focusTime = "";
+        currentMember.restTime = "休息中";
+        if (currentMember.status !== "resting") {
+          currentMember.status = "resting";
+        }
+      }
+      
+      // 延迟清除标志，确保状态已同步
+      setTimeout(() => {
+        this.isUpdatingStatus = false;
+      }, 1000);
     },
 
     getInitials(name) {
@@ -822,38 +893,42 @@ export default {
       console.log("番茄钟开始 - 切换到专注状态");
       this.syncLocalStatus("focusing");
     },
-
+    
     handleTimerPause() {
       console.log("番茄钟暂停 - 保持专注状态");
+      // 暂停专注计时
+      this.pauseFocusTimer();
       // 暂停时仍视为专注态，不切换状态
       // 但可以更新一下服务器状态，确保状态一致
       if (this.userStatus.isFocusing) {
         this.updateUserStatusToServer();
       }
     },
-
+    
     handleTimerResume() {
       console.log("番茄钟继续 - 保持专注状态");
       // 继续时确保状态为专注
       if (!this.userStatus.isFocusing) {
         this.syncLocalStatus("focusing");
       } else {
+        // 恢复专注计时
+        this.resumeFocusTimer();
         // 如果已经是专注状态，只更新服务器
         this.updateUserStatusToServer();
       }
     },
-
+    
     handleTimerStop() {
       console.log("番茄钟停止 - 切换到休息状态");
       this.syncLocalStatus("resting");
     },
-
+    
     handleFocusCompleted(sessions) {
       console.log(`专注完成，已完成 ${sessions} 个番茄 - 进入休息状态`);
       // 专注完成，进入休息
       this.syncLocalStatus("resting");
     },
-
+    
     handleBreakSkipped() {
       console.log("休息被跳过 - 切换到专注状态");
       this.syncLocalStatus("focusing");
@@ -887,7 +962,7 @@ export default {
             alert("用户身份信息错误，无法退出。请尝试刷新页面或重新登录。");
             return;
           }
-        } catch (error) {
+      } catch (error) {
           console.error("重新加载用户信息失败:", error);
           alert("获取用户信息失败，无法退出。请尝试刷新页面或重新登录。");
           return;
@@ -997,9 +1072,9 @@ export default {
         this.loading = false;
       }
     },
-
+    
     goToHome() {
-      this.$router.push("/");
+      this.$router.push("/home");
     },
 
     goToJoinRoom() {
@@ -1103,7 +1178,7 @@ export default {
 
       // 停止所有定时器
       this.stopMembersAutoRefresh();
-      if (this.focusTimer) {
+    if (this.focusTimer) {
         clearInterval(this.focusTimer);
         this.focusTimer = null;
       }
@@ -1136,7 +1211,8 @@ export default {
           return {
             ...member,
             status,
-            focusTime: status === "focusing" ? "进行中" : "",
+            // 使用实际的专注时间，而不是硬编码的"进行中"
+            focusTime: status === "focusing" ? this.userStatus.focusTime : "",
             restTime: status === "resting" ? "休息中" : "",
           };
         }
@@ -1154,7 +1230,8 @@ export default {
             username: this.currentUser?.username || "用户",
             role: this.isRoomOwner ? "host" : "member",
             status,
-            focusTime: status === "focusing" ? "进行中" : "",
+            // 使用实际的专注时间，而不是硬编码的"进行中"
+            focusTime: status === "focusing" ? this.userStatus.focusTime : "",
             restTime: status === "resting" ? "休息中" : "",
             isCurrentUser: true,
           },
@@ -1762,7 +1839,7 @@ export default {
   .room-layout {
     grid-template-columns: 1fr;
   }
-
+  
   .right-section {
     position: static;
   }
@@ -1772,41 +1849,41 @@ export default {
   .main-content {
     padding: 20px;
   }
-
+  
   .room-header {
     flex-direction: column;
     gap: 20px;
     align-items: flex-start;
     padding: 20px;
   }
-
+  
   .room-title {
     font-size: 1.8em;
   }
-
+  
   .room-meta {
     flex-direction: column;
     gap: 10px;
   }
-
+  
   .section-header {
     flex-direction: column;
     gap: 12px;
     align-items: flex-start;
   }
-
+  
   .stats {
     align-self: flex-start;
   }
-
+  
   .navbar {
     padding: 12px 20px;
   }
-
+  
   .nav-links {
     gap: 10px;
   }
-
+  
   .nav-link {
     padding: 6px 12px;
     font-size: 0.9em;
