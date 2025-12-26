@@ -152,4 +152,21 @@ body {
 #app {
   min-height: 100vh;
 }
+
+/* 主题滤镜 */
+
+/* 排除所有图片 */
+:root[data-theme] img {
+  filter: none !important;
+}
+
+:root[data-theme="warm"] {
+  filter: hue-rotate(-30deg) saturate(1.1);
+}
+
+:root[data-theme="dark"] {
+  filter: hue-rotate(180deg) invert(1) saturate(0.8);
+}
+
+
 </style>
