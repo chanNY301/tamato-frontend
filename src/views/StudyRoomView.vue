@@ -198,8 +198,37 @@
     <div v-if="showSettings" class="modal-overlay">
       <div class="settings-modal">
         <h3>房间设置</h3>
+        
         <!-- 设置内容 -->
-        <button @click="closeSettings" class="close-btn">关闭</button>
+        <div class="settings-form">
+          <div class="form-group">
+            <label>房间名称</label>
+            <input v-model="roomSettings.roomName" type="text">
+          </div>
+          
+          <div class="form-group">
+            <label>最大人数 ({{ members.length }}/{{ roomSettings.maxMembers }})</label>
+            <input v-model.number="roomSettings.maxMembers" type="number" min="2" max="10">
+          </div>
+          
+          <div class="form-group">
+            <label>背景音乐</label>
+            <select v-model="roomSettings.musicName">
+              <option value="无背景音乐">无背景音乐</option>
+              <option value="轻音乐">轻音乐</option>
+              <option value="白噪音">白噪音</option>
+              <option value="自然声">自然声</option>
+              <option value="古典音乐">古典音乐</option>
+            </select>
+          </div>
+        </div>
+        
+        <div class="modal-actions">
+          <button @click="saveRoomSettings" class="action-btn primary-btn" :disabled="saving">
+            {{ saving ? '保存中...' : '保存' }}
+          </button>
+          <button @click="closeSettings" class="action-btn secondary-btn">关闭</button>
+        </div>
       </div>
     </div>
   </div>
@@ -211,6 +240,7 @@ import {
   leaveRoom,
   getRoomMembers,
   deleteRoom,
+  updateRoom,
   updateUserStatus,
 } from "@/api/studyRooms";
 import PomodoroTimer from "@/components/PomodoroTimer/PomodoroTimer.vue";
@@ -252,6 +282,13 @@ export default {
       refreshTimer: null,
       isUpdatingStatus: false, // 标志：正在更新状态，防止loadMembersData干扰
       refreshInterval: 10000, // 改为10秒刷新一次，减少服务器压力
+
+      roomSettings: {
+        roomName: '',
+        maxMembers: 4,
+        musicName: '无'
+      },
+      saving: false
     };
   },
   computed: {
@@ -288,8 +325,8 @@ export default {
       handler(newRoomId) {
         if (newRoomId) {
           this.validateAndLoadRoom();
-      }
-    },
+        }
+      },
     },
     "userStatus.isFocusing"(newVal, oldVal) {
       if (newVal !== oldVal) {
@@ -943,7 +980,36 @@ export default {
     },
 
     showRoomSettings() {
+      // 初始化设置数据（字段名转换）
+      this.roomSettings = {
+        roomName: this.roomInfo.room_name || '',
+        maxMembers: this.roomInfo.max_members || 4,
+        musicName: this.roomInfo.music_name || '无'
+      };
       this.showSettings = true;
+    },
+
+    async saveRoomSettings() {
+      this.saving = true;
+      
+      try {
+        const response = await updateRoom(this.roomId, this.roomSettings);
+        
+        if (response && response.success) {
+          // 更新本地数据（字段名转换）
+          this.roomInfo.room_name = this.roomSettings.roomName;
+          this.roomInfo.max_members = this.roomSettings.maxMembers;
+          this.roomInfo.music_name = this.roomSettings.musicName;
+          
+          this.closeSettings();
+          alert('设置已保存');
+        }
+      } catch (error) {
+        console.error('保存失败:', error);
+        alert('保存失败');
+      } finally {
+        this.saving = false;
+      }
     },
 
     closeSettings() {
@@ -1896,5 +1962,35 @@ export default {
     padding: 6px 12px;
     font-size: 0.9em;
   }
+}
+
+/* 在现有样式后面添加 */
+.settings-form {
+  margin: 20px 0;
+}
+
+.form-group {
+  margin-bottom: 15px;
+}
+
+.form-group label {
+  display: block;
+  margin-bottom: 5px;
+  color: #666;
+}
+
+.form-group input,
+.form-group select {
+  width: 100%;
+  padding: 8px 12px;
+  border: 1px solid #ddd;
+  border-radius: 6px;
+}
+
+.modal-actions {
+  display: flex;
+  gap: 10px;
+  justify-content: flex-end;
+  margin-top: 20px;
 }
 </style>
