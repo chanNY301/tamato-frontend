@@ -29,7 +29,7 @@
           @mouseenter="handleDropdownEnter"
           @mouseleave="handleDropdownLeave"
         >
-          <div class="dropdown-item" @click="toggleTheme">
+          <div class="dropdown-item" @click="handleThemeClick">
             <span class="dropdown-icon">🎨</span>
             主题设置
           </div>
@@ -96,6 +96,13 @@
       </aside>
     </main>
   </div>
+  <!-- 在文件的最后，</template>标签之前添加 -->
+  <ThemeModal
+    :visible="showThemeModal"
+    :current-theme="currentTheme"
+    @theme-select="handleThemeSelect"
+    @update:visible="showThemeModal = $event"
+  />
 </template>
 
 <script>
@@ -109,6 +116,8 @@ import QuickJoin from '@/components/QuickJoin/QuickJoin.vue'
 import FriendList from '@/components/FriendList/FriendList.vue'
 // 导入每日签到组件
 import DailyCheckIn from '@/components/DailyCheckIn/DailyCheckIn.vue'
+//导入主题设置组件
+import ThemeModal from '@/components/ThemeModal/ThemeModal.vue';
 
 export default {
   name: 'HomeView',
@@ -117,7 +126,8 @@ export default {
     FriendList,
     TaskSidebar,
     QuickJoin,
-    DailyCheckIn
+    DailyCheckIn,
+    ThemeModal
   },
   data() {
     return {
@@ -151,7 +161,12 @@ export default {
         { id: 8, name: '文学创作间', members: 11, status: '专注中' },
         { id: 9, name: '医学考研组', members: 20, status: '专注中' },
         { id: 10, name: '法律自习室', members: 7, status: '空闲' }
-      ]
+      ],
+
+      // 主题设置相关
+      currentTheme: 'default',
+      showThemeModal: false,
+      showLoginPrompt: false
     }
   },
   computed: {
@@ -189,7 +204,13 @@ export default {
       }
       // 默认头像
       return this.avatarImage
-    }
+    },
+    // 判断用户是否已登录（使用token检查）
+      isLoggedIn() {
+        const token = localStorage.getItem('token') || sessionStorage.getItem('token');
+        return !!token;
+      }
+
   },
   created() {
     // 组件创建时动态加载海报
@@ -201,6 +222,18 @@ export default {
   mounted() {
     // 启动自动轮播
     this.startCarousel()
+
+    // 初始化主题：优先使用本地存储的主题
+    const savedTheme = localStorage.getItem('app-theme');
+    if (savedTheme) {
+      this.applyTheme(savedTheme);
+    } else {
+      // 检测系统偏好
+      const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+      if (prefersDark) {
+        this.applyTheme('dark');
+      }
+    }
   },
   
   beforeUnmount() {
@@ -545,8 +578,61 @@ export default {
       console.log('签到成功:', data)
       // 可以在这里显示成功提示或更新其他数据
       // 例如：更新用户资产信息、显示通知等
+    },
+
+    // 处理主题设置点击
+  handleThemeClick() {
+    // 关闭下拉菜单
+    this.showDropdown = false;
+    
+    // 检查登录状态
+    if (!this.isLoggedIn) {
+      this.showLoginRequired();
+      return;
     }
+    
+    // 已登录，打开主题弹窗
+    this.openThemeModal();
+  },
+  
+  // 打开主题设置弹窗
+  openThemeModal() {
+    this.showThemeModal = true;
+  },
+  
+  // 关闭主题设置弹窗
+  closeThemeModal() {
+    this.showThemeModal = false;
+  },
+  
+  // 显示登录提示
+  showLoginRequired() {
+    if (confirm('主题设置需要登录后才能使用\n\n是否立即前往登录？')) {
+      this.$router.push('/login');
+    }
+  },
+  
+  // 应用主题
+  applyTheme(themeId) {
+    const html = document.documentElement;
+    
+    // 移除所有主题属性
+    html.removeAttribute('data-theme');
+    
+    if (themeId !== 'default') {
+      html.setAttribute('data-theme', themeId);
+    }
+    
+    // 保存到本地存储
+    localStorage.setItem('app-theme', themeId);
+    this.currentTheme = themeId;
+  },
+  
+  // 处理主题选择
+  handleThemeSelect(themeId) {
+    this.applyTheme(themeId);
   }
+}
 }
 </script>
 
