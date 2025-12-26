@@ -1,6 +1,69 @@
 import request from './request'
 import { API_BASE_URL, getToken } from './config'
 
+// 设置用户状态为离线（用于页面关闭时调用）
+// 通过 userId 精确更新，避免多窗口/多账号互相影响
+export const setUserOffline = (userId) => {
+  if (!userId) {
+    console.log('setUserOffline: userId 为空，跳过')
+    return Promise.resolve({ success: true })
+  }
+
+  const url = `${API_BASE_URL}/users/${userId}/offline`
+  const token = getToken()
+
+  console.log('setUserOffline: 准备发送离线请求', { userId, url, hasToken: !!token })
+
+  // 优先使用 navigator.sendBeacon（最可靠，专门为页面卸载设计）
+  if (navigator.sendBeacon) {
+    try {
+      // sendBeacon 不能设置自定义 headers，所以我们需要在 URL 中传递 token
+      // 或者使用 FormData（但后端需要支持）
+      // 为了简单，我们使用 fetch with keepalive 作为主要方式
+      // sendBeacon 作为备用
+    } catch (e) {
+      console.log('setUserOffline: sendBeacon 不可用', e)
+    }
+  }
+
+  // 使用 fetch 的 keepalive 选项，确保请求在页面关闭后也能完成
+  try {
+    const headers = {
+      'Content-Type': 'application/json'
+    }
+    
+    // 如果有 token，添加到 headers（后端需要认证）
+    if (token) {
+      headers['Authorization'] = `Bearer ${token}`
+    }
+
+    // 使用 fetch with keepalive（这是最可靠的方式）
+    const fetchPromise = fetch(url, {
+      method: 'POST',
+      headers: headers,
+      body: JSON.stringify({}),
+      keepalive: true // 关键：确保请求在页面关闭后也能完成
+    })
+
+    // 不等待响应，立即返回（避免阻塞页面关闭）
+    fetchPromise.then(response => {
+      console.log('setUserOffline: 请求发送成功', response.status, response.statusText)
+      if (!response.ok) {
+        console.warn('setUserOffline: 请求返回非成功状态', response.status)
+      }
+    }).catch((err) => {
+      // 静默处理错误，避免阻塞页面关闭
+      console.log('setUserOffline: 请求发送失败（页面可能已关闭）', err)
+    })
+    
+    return Promise.resolve({ success: true })
+  } catch (e) {
+    // 如果 fetch 失败，静默处理
+    console.log('setUserOffline: fetch 调用异常', e)
+    return Promise.resolve({ success: true })
+  }
+}
+
 // 获取当前用户信息
 export const getCurrentUser = async () => {
   return request.get(`${API_BASE_URL}/user/me`)

@@ -321,14 +321,18 @@ export default {
       if (room.current_members >= room.max_members) {
         return 'status-full'
       }
-      return room.is_active ? 'status-active' : 'status-inactive'
+      // 房间存在就一定有成员（房主离开会解散房间），所以总是显示为活跃状态
+      return 'status-active'
     },
 
     getStatusText(room) {
       if (room.current_members >= room.max_members) {
         return '已满'
       }
-      return room.is_active ? '专注中' : '空闲'
+      // 房间存在就一定有成员（房主离开会解散房间）
+      // 不再显示"专注中"，因为无法从房间列表API获取成员的实际状态
+      // 统一显示"进行中"
+      return '进行中'
     },
 
     joinRoom(roomId) {

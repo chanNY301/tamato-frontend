@@ -615,13 +615,19 @@ export default {
       activeTab: 'friends',
       selectedFriend: null,
       friendSubTab: 'info',
-      loadingStats: false
+      loadingStats: false,
+      refreshTimer: null, // 好友列表自动刷新定时器
+      refreshInterval: 10000 // 每10秒刷新一次好友状态
     }
   },
   async mounted() {
     await this.initUser()
     await this.loadFriendRequests()
     await this.loadFriends()
+    // 启动自动刷新
+    this.startAutoRefresh()
+    // 监听页面可见性变化
+    this.setupVisibilityHandler()
   },
   methods: {
     async initUser() {

@@ -65,7 +65,7 @@
                 class="meta-item debug-info"
                 style="color: #999; font-size: 0.85em"
               >
-                调试: 当前用户角色 = {{ getCurrentUserRole() }}
+                 当前用户角色 = {{ getCurrentUserRole() }}
               </span>
             </div>
           </div>
