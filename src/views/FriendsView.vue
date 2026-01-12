@@ -270,6 +270,14 @@
                       {{ selectedFriend.friend_status || selectedFriend.status || '离线' }}
                     </span>
                   </div>
+                  <div v-if="selectedFriend.birthday" class="info-item">
+                    <span class="info-label">生日</span>
+                    <span class="info-value">{{ formatBirthday(selectedFriend.birthday) }}</span>
+                  </div>
+                  <div v-if="selectedFriend.province" class="info-item">
+                    <span class="info-label">地区</span>
+                    <span class="info-value">{{ selectedFriend.province }}</span>
+                  </div>
                   <div v-if="selectedFriend.tomatoStatus" class="info-item">
                     <span class="info-label">番茄钟状态</span>
                     <span :class="['info-value', 'tomato-value', selectedFriend.tomatoStatus]">
@@ -720,6 +728,31 @@ export default {
       if (!timeStr) return '-'
       const date = new Date(timeStr)
       return date.toLocaleDateString() + ' ' + date.toLocaleTimeString().slice(0, 5)
+    },
+
+    formatBirthday(birthdayStr) {
+      if (!birthdayStr) return '未知'
+      // 如果是日期字符串格式 (YYYY-MM-DD)
+      if (typeof birthdayStr === 'string' && birthdayStr.includes('-')) {
+        const date = new Date(birthdayStr)
+        if (!isNaN(date.getTime())) {
+          const year = date.getFullYear()
+          const month = date.getMonth() + 1
+          const day = date.getDate()
+          return `${year}年${month}月${day}日`
+        }
+      }
+      // 如果是时间戳
+      if (typeof birthdayStr === 'number') {
+        const date = new Date(birthdayStr)
+        if (!isNaN(date.getTime())) {
+          const year = date.getFullYear()
+          const month = date.getMonth() + 1
+          const day = date.getDate()
+          return `${year}年${month}月${day}日`
+        }
+      }
+      return birthdayStr || '未知'
     },
 
     goToHome() {

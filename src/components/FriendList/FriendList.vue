@@ -56,10 +56,6 @@
               <span>{{ friend.birthday ? formatBirthday(friend.birthday) : '未知' }}</span>
             </div>
             <div class="detail-row">
-              <label>邮箱:</label>
-              <span>{{ friend.email || '未知' }}</span>
-            </div>
-            <div class="detail-row">
               <label>地区:</label>
               <span>{{ friend.province || '未知' }}</span>
             </div>
@@ -123,7 +119,6 @@ export default {
         status: data.status || data.friend_status || '未知',
         statusClass: this.getStatusClass(data.status || data.friend_status),
         avatar: data.avatar,
-        email: data.email,
         phone: data.phone,
         sex: data.sex,
         birthday: data.birthday,
