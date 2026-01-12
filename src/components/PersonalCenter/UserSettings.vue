@@ -28,10 +28,10 @@
 
         <div class="setting-item">
           <div class="setting-label">
-            <label>学习时长可见性</label>
-            <span class="setting-desc">控制谁可以看到您的学习时长</span>
+            <label>邮箱可见性</label>
+            <span class="setting-desc">控制谁可以看到您的邮箱</span>
           </div>
-          <select v-model="privacyForm.show_study_time" class="form-select">
+          <select v-model="privacyForm.show_email" class="form-select">
             <option value="public">所有人可见</option>
             <option value="friends">仅好友可见</option>
             <option value="private">仅自己可见</option>
@@ -119,7 +119,7 @@ export default {
       errorMessage: '',
       privacyForm: {
         show_birthday: 'public',
-        show_study_time: 'public',
+        show_email: 'public',
         show_location: 'public',
         allow_friend_request: true,
         searchable: true
@@ -151,7 +151,7 @@ export default {
         if (data) {
           this.privacyForm = {
             show_birthday: data.show_birthday || 'public',
-            show_study_time: data.show_study_time || 'public',
+            show_email: data.show_email || 'public',
             show_location: data.show_location || 'public',
             allow_friend_request: data.allow_friend_request !== false, // 默认为true
             searchable: data.searchable !== false // 默认为true

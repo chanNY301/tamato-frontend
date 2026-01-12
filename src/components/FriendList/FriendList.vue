@@ -52,12 +52,12 @@
               <span>{{ friend.user_id }}</span>
             </div>
             <div class="detail-row">
-              <label>邮箱:</label>
-              <span>{{ friend.email || '保密' }}</span>
+              <label>生日:</label>
+              <span>{{ friend.birthday ? formatBirthday(friend.birthday) : '未知' }}</span>
             </div>
             <div class="detail-row">
-              <label>手机:</label>
-              <span>{{ friend.phone || '保密' }}</span>
+              <label>邮箱:</label>
+              <span>{{ friend.email || '未知' }}</span>
             </div>
             <div class="detail-row">
               <label>地区:</label>
@@ -215,6 +215,27 @@ export default {
 
     handleAvatarError(event) {
       event.target.src = this.defaultAvatar;
+    },
+
+    // 格式化生日
+    formatBirthday(birthday) {
+      if (!birthday) return '未设置';
+      // 如果是时间戳（毫秒）
+      if (typeof birthday === 'number') {
+        const date = new Date(birthday);
+        return `${date.getFullYear()}年${date.getMonth() + 1}月${date.getDate()}日`;
+      }
+      // 如果是日期字符串
+      if (typeof birthday === 'string') {
+        // 尝试解析日期字符串
+        const date = new Date(birthday);
+        if (!isNaN(date.getTime())) {
+          return `${date.getFullYear()}年${date.getMonth() + 1}月${date.getDate()}日`;
+        }
+        // 如果已经是格式化好的字符串，直接返回
+        return birthday;
+      }
+      return '未设置';
     },
 
     // 启动自动刷新好友列表
