@@ -96,6 +96,15 @@ export const leaveRoom = (roomId, userId) => {
   return request.post(url, {}, {})
 }
 
+// 房主退出自习室（房主身份转移给下一个成员）
+export const leaveRoomAsHost = (roomId, userId) => {
+  const url = `${BASE_URL}/rooms/${roomId}/leave-as-host?userId=${userId}`
+  
+  console.log('房主退出房间请求URL:', url)
+  
+  return request.post(url, {}, {})
+}
+
 // 获取自习室成员列表
 export const getRoomMembers = (roomId, userId) => {
   const token = getToken()

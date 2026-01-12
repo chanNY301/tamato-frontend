@@ -1033,11 +1033,57 @@ export default {
 
     goToHome() {
       this.$router.push('/home')
+    },
+
+    // 启动自动刷新好友列表
+    startAutoRefresh() {
+      // 如果已经有定时器，先清除
+      if (this.refreshTimer) {
+        clearInterval(this.refreshTimer)
+      }
+      
+      // 设置定时器，每10秒刷新一次好友列表
+      this.refreshTimer = setInterval(() => {
+        // 只有在好友标签页且不在加载中时才刷新
+        if (this.activeTab === 'friends' && !this.loadingFriends) {
+          this.loadFriends()
+        }
+      }, this.refreshInterval)
+      
+      console.log('✅ 好友列表自动刷新已启动，间隔:', this.refreshInterval / 1000, '秒')
+    },
+
+    // 停止自动刷新
+    stopAutoRefresh() {
+      if (this.refreshTimer) {
+        clearInterval(this.refreshTimer)
+        this.refreshTimer = null
+        console.log('⏹️ 好友列表自动刷新已停止')
+      }
+    },
+
+    // 设置页面可见性监听（页面隐藏时停止刷新，显示时恢复刷新）
+    setupVisibilityHandler() {
+      document.addEventListener('visibilitychange', () => {
+        if (document.hidden) {
+          // 页面隐藏时停止刷新
+          this.stopAutoRefresh()
+        } else {
+          // 页面显示时恢复刷新
+          this.startAutoRefresh()
+          // 立即刷新一次，获取最新状态
+          if (this.activeTab === 'friends' && !this.loadingFriends) {
+            this.loadFriends()
+          }
+        }
+      })
     }
   },
   beforeUnmount() {
     // 清理所有倒计时定时器
     Object.values(this.countdownTimers).forEach(timer => clearInterval(timer))
+    // 清理自动刷新定时器
+    this.stopAutoRefresh()
   }
 }
 </script>

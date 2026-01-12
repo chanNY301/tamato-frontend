@@ -4,14 +4,14 @@
     <nav class="navbar">
       <div class="nav-brand">Tomato</div>
       <div class="nav-links">
-        <!-- 房主显示解散按钮，普通成员显示退出按钮 -->
+        <!-- 房主显示退出按钮，普通成员显示退出按钮 -->
         <button
           v-if="isRoomOwner"
-          @click="disbandRoom"
-          class="nav-link disband-nav-btn"
-          title="解散自习室（房主专用）"
+          @click="leaveRoomAsHost"
+          class="nav-link"
+          title="退出自习室"
         >
-          解散自习室
+          退出自习室
         </button>
         <button v-else @click="leaveRoom" class="nav-link">退出房间</button>
       </div>
@@ -31,11 +31,14 @@
           <div class="not-found-icon">🚫</div>
           <h2 class="not-found-title">自习室不存在</h2>
           <p class="not-found-message">
-            房间ID <strong>{{ roomId }}</strong> 不存在或已关闭
+            房间ID <strong>{{ roomId }}</strong> 不存在或已被解散
           </p>
           <div class="not-found-actions">
             <button @click="goToJoinRoom" class="action-btn primary-btn">
               加入其他自习室
+            </button>
+            <button @click="goToHome" class="action-btn secondary-btn">
+              返回主页面
             </button>
           </div>
         </div>
@@ -238,6 +241,7 @@
 import {
   getRoomDetail,
   leaveRoom,
+  leaveRoomAsHost,
   getRoomMembers,
   deleteRoom,
   updateRoom,
@@ -498,7 +502,8 @@ export default {
           response.status === 404 ||
           (response.success === false &&
             (response.message?.includes("不存在") ||
-              response.message?.includes("已解散")))
+              response.message?.includes("已解散") ||
+              response.message?.includes("Not Found")))
         ) {
           console.log("检测到房间已被解散");
           this.handleRoomDisbanded();
@@ -680,9 +685,17 @@ export default {
           error.status === 404 ||
           error.message?.includes("404") ||
           error.message?.includes("不存在") ||
-          error.message?.includes("已解散")
+          error.message?.includes("已解散") ||
+          error.message?.includes("Not Found")
         ) {
           console.log("检测到房间已被解散（从错误中）");
+          this.handleRoomDisbanded();
+          return;
+        }
+        // 如果错误信息中包含房间相关的错误，也认为是房间被解散
+        const errorMsg = error.message || '';
+        if (errorMsg.includes('房间') && (errorMsg.includes('不存在') || errorMsg.includes('已解散'))) {
+          console.log("检测到房间已被解散（从错误消息中）");
           this.handleRoomDisbanded();
           return;
         }
@@ -1155,6 +1168,63 @@ export default {
       this.$router.push("/join-room");
     },
 
+    async leaveRoomAsHost() {
+      if (!this.isRoomOwner) {
+        console.warn("非房主尝试退出房间");
+        return;
+      }
+
+      const confirmed = confirm(
+        "⚠️ 确定要退出自习室吗？\n\n" +
+          "• 房主身份将自动转移给下一个成员\n" +
+          "• 如果房间内没有其他成员，房间将被解散\n" +
+          "• 退出后将无法恢复房主身份\n\n" +
+          '如果确定，请点击"确定"'
+      );
+
+      if (!confirmed) {
+        console.log("用户取消退出房间");
+        return;
+      }
+
+      try {
+        this.loading = true;
+        this.stopMembersAutoRefresh();
+
+        console.log("开始房主退出房间...");
+        const userIdNumber = Number(this.currentUserId);
+        const userIdForRequest = isNaN(userIdNumber)
+          ? this.currentUserId
+          : userIdNumber;
+
+        const response = await leaveRoomAsHost(this.roomId, userIdForRequest);
+        console.log("房主退出房间响应:", response);
+
+        if (response && (response.code === 200 || response.success === true)) {
+          console.log("✅ 房主退出房间成功");
+          alert("✅ 已成功退出自习室，房主身份已转移");
+          this.goToHome();
+        } else {
+          const errorMsg = response?.message || "退出失败，请稍后再试";
+          console.error("房主退出房间失败:", errorMsg);
+          alert(`退出失败: ${errorMsg}`);
+        }
+      } catch (error) {
+        console.error("房主退出房间失败:", error);
+        let errorMessage = "退出失败，请稍后再试";
+        if (error.message) {
+          errorMessage = error.message;
+        } else if (error.status === 403) {
+          errorMessage = "权限不足，无法退出自习室";
+        } else if (error.status === 404) {
+          errorMessage = "房间不存在";
+        }
+        alert(errorMessage);
+      } finally {
+        this.loading = false;
+      }
+    },
+
     async disbandRoom() {
       if (!this.isRoomOwner) {
         console.warn("非房主尝试解散房间");
@@ -1196,7 +1266,20 @@ export default {
 
         if (response && (response.code === 200 || response.success === true)) {
           console.log("✅ 自习室解散成功");
+          
+          // 停止所有定时器和刷新
+          this.stopMembersAutoRefresh();
+          if (this.focusTimer) {
+            clearInterval(this.focusTimer);
+            this.focusTimer = null;
+          }
+          
+          // 设置房间不存在标志
+          this.roomNotFound = true;
+          
           alert("✅ 自习室已成功解散");
+          
+          // 立即跳转到首页
           this.goToHome();
         } else {
           const errorMsg = response?.message || "解散失败，请稍后再试";
@@ -1229,12 +1312,30 @@ export default {
       if (this.refreshTimer) {
         clearInterval(this.refreshTimer);
       }
-      this.refreshTimer = setInterval(() => {
+      this.refreshTimer = setInterval(async () => {
         // 如果房间已不存在，停止刷新
         if (this.roomNotFound) {
           this.stopMembersAutoRefresh();
           return;
         }
+        // 先验证房间是否存在，如果不存在则触发handleRoomDisbanded
+        try {
+          const response = await getRoomDetail(this.roomId, this.currentUserId);
+          if (!response || !(response.success === true || response.success === "true") || !response.data) {
+            // 房间不存在或被解散
+            console.log("定时刷新检测到房间不存在或被解散");
+            this.handleRoomDisbanded();
+            return;
+          }
+        } catch (error) {
+          // 如果获取房间详情失败（404等），说明房间被解散
+          if (error.status === 404 || error.message?.includes("404") || error.message?.includes("不存在")) {
+            console.log("定时刷新检测到房间已被解散（从错误中）");
+            this.handleRoomDisbanded();
+            return;
+          }
+        }
+        // 如果房间存在，继续加载成员数据
         this.loadMembersData();
       }, this.refreshInterval);
     },
@@ -1248,25 +1349,17 @@ export default {
 
     // 处理房间被解散的情况
     handleRoomDisbanded() {
-      console.log("房间已被解散，准备跳转");
+      console.log("房间已被解散，显示房间不存在页面");
 
       // 停止所有定时器
       this.stopMembersAutoRefresh();
-    if (this.focusTimer) {
+      if (this.focusTimer) {
         clearInterval(this.focusTimer);
         this.focusTimer = null;
       }
 
-      // 设置房间不存在标志
+      // 设置房间不存在标志，显示房间不存在页面
       this.roomNotFound = true;
-
-      // 显示提示信息
-      alert("⚠️ 自习室已被房主解散\n\n所有成员已被移出，即将返回首页");
-
-      // 延迟跳转，让用户看到提示
-      setTimeout(() => {
-        this.goToHome();
-      }, 500);
     },
 
     updateMemberStatusLocally(status) {

@@ -88,11 +88,19 @@ export default {
       error: '',
       friendsList: [], 
       expandedUserId: null,
-      defaultAvatar: avatarImage
+      defaultAvatar: avatarImage,
+      refreshTimer: null, // 自动刷新定时器
+      refreshInterval: 10000 // 每10秒刷新一次
     };
   },
   created() {
     this.fetchFriends();
+    // 启动自动刷新
+    this.startAutoRefresh();
+  },
+  beforeUnmount() {
+    // 组件销毁时清理定时器
+    this.stopAutoRefresh();
   },
   methods: {
     getStatusClass(status) {
@@ -208,6 +216,33 @@ export default {
     handleAvatarError(event) {
       event.target.src = this.defaultAvatar;
     },
+
+    // 启动自动刷新好友列表
+    startAutoRefresh() {
+      // 如果已经有定时器，先清除
+      if (this.refreshTimer) {
+        clearInterval(this.refreshTimer);
+      }
+      
+      // 设置定时器，每10秒刷新一次好友列表
+      this.refreshTimer = setInterval(() => {
+        // 只有在不在加载中时才刷新
+        if (!this.loading) {
+          this.fetchFriends();
+        }
+      }, this.refreshInterval);
+      
+      console.log('✅ FriendList 自动刷新已启动，间隔:', this.refreshInterval / 1000, '秒');
+    },
+
+    // 停止自动刷新
+    stopAutoRefresh() {
+      if (this.refreshTimer) {
+        clearInterval(this.refreshTimer);
+        this.refreshTimer = null;
+        console.log('⏹️ FriendList 自动刷新已停止');
+      }
+    }
   },
 };
 </script>

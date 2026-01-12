@@ -80,26 +80,25 @@ export default {
       // 保存组件实例引用
       const self = this
       
-      // 使用 beforeunload 事件监听页面关闭
-      // 关键：直接从当前窗口的 token 解析 userId，不依赖任何共享状态
-      window.addEventListener('beforeunload', () => {
+      // 统一的处理函数：更新用户状态为离线
+      const handlePageUnload = (eventName) => {
         // 防止重复发送请求
         if (self.offlineRequestSent) {
-          console.log('⚠️ beforeunload: 离线请求已发送，跳过重复请求')
+          console.log(`⚠️ ${eventName}: 离线请求已发送，跳过重复请求`)
           return
         }
 
         // 获取当前窗口的 token（每个窗口的 localStorage 是独立的）
         const token = getToken()
         if (!token) {
-          console.log('⚠️ beforeunload: 没有 token，跳过离线更新')
+          console.log(`⚠️ ${eventName}: 没有 token，跳过离线更新`)
           return
         }
 
         // 直接从 token 解析 userId（这是最可靠的方式，不依赖任何共享状态）
         const userId = getUserIdFromToken(token)
         
-        console.log('🔔 beforeunload 事件触发 [窗口ID:', window.name || 'unnamed', ']:', {
+        console.log(`🔔 ${eventName} 事件触发 [窗口ID: ${window.name || 'unnamed'}]:`, {
           userId: userId,
           tokenPreview: token ? token.substring(0, 20) + '...' : null,
           hasToken: !!token,
@@ -112,25 +111,31 @@ export default {
           // 标记已发送，防止重复
           self.offlineRequestSent = true
           
-          console.log('✅ beforeunload: 准备更新离线状态', { 
+          console.log(`✅ ${eventName}: 准备更新离线状态`, { 
             userId,
             windowId: window.name || 'unnamed'
           })
           
-          setUserOffline(userId).then(() => {
-            console.log('✅ 离线状态更新请求已发送:', userId)
-          }).catch((err) => {
-            // 静默处理错误，避免阻塞页面关闭
-            console.log('❌ 更新离线状态失败（页面已关闭）:', err)
-          })
+          // 调用离线接口（使用 fetch with keepalive，确保请求在页面关闭后也能完成）
+          setUserOffline(userId)
         } else {
-          console.log('⚠️ beforeunload: 无法从 token 解析 userId，跳过离线更新')
+          console.log(`⚠️ ${eventName}: 无法从 token 解析 userId，跳过离线更新`)
         }
+      }
+      
+      // 使用 beforeunload 事件监听页面关闭（桌面浏览器）
+      window.addEventListener('beforeunload', () => {
+        handlePageUnload('beforeunload')
       })
 
-      // 使用 visibilitychange 事件监听页面隐藏（切换标签页、最小化等）
-      // 注意：这里不更新为离线，因为用户可能只是切换标签页
-      // 只在真正关闭页面时才更新为离线
+      // 使用 pagehide 事件监听页面隐藏（移动浏览器更可靠，也适用于桌面浏览器）
+      // pagehide 事件在 beforeunload 之后触发，但在某些情况下更可靠
+      window.addEventListener('pagehide', () => {
+        // 只有当页面被持久化缓存时（persisted=true），说明页面被关闭
+        // 如果 persisted=false，页面只是被添加到bfcache，用户可能还会回来
+        // 但为了保险起见，我们也在 pagehide 时更新状态
+        handlePageUnload('pagehide')
+      })
     }
   }
 }

@@ -14,25 +14,15 @@ export const setUserOffline = (userId) => {
 
   console.log('setUserOffline: 准备发送离线请求', { userId, url, hasToken: !!token })
 
-  // 优先使用 navigator.sendBeacon（最可靠，专门为页面卸载设计）
-  if (navigator.sendBeacon) {
-    try {
-      // sendBeacon 不能设置自定义 headers，所以我们需要在 URL 中传递 token
-      // 或者使用 FormData（但后端需要支持）
-      // 为了简单，我们使用 fetch with keepalive 作为主要方式
-      // sendBeacon 作为备用
-    } catch (e) {
-      console.log('setUserOffline: sendBeacon 不可用', e)
-    }
-  }
-
-  // 使用 fetch 的 keepalive 选项，确保请求在页面关闭后也能完成
+  // 使用 fetch with keepalive（最可靠的方式，支持自定义 headers）
+  // keepalive 选项确保请求在页面关闭后也能完成
+  // 由于后端接口需要认证，必须使用 fetch 而不是 sendBeacon
   try {
     const headers = {
       'Content-Type': 'application/json'
     }
     
-    // 如果有 token，添加到 headers（后端需要认证）
+    // 添加 token 到 headers（后端接口需要认证）
     if (token) {
       headers['Authorization'] = `Bearer ${token}`
     }
