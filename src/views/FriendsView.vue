@@ -94,11 +94,6 @@
                     <span class="task-icon">📚</span>
                     <span class="task-text">{{ friend.currentTask }}</span>
                   </div>
-                  
-                  <div v-if="friend.countdown" class="countdown-info">
-                    <span class="countdown-icon">⏱️</span>
-                    <span class="countdown-text">剩余：{{ friend.countdown }}</span>
-                  </div>
                 </div>
                 
                 <div class="friend-actions">
@@ -298,7 +293,7 @@
                 </div>
               </div>
 
-              <div v-if="selectedFriend.currentTask || selectedFriend.countdown" class="info-section">
+              <div v-if="selectedFriend.currentTask" class="info-section">
                 <h3 class="info-section-title">当前活动</h3>
                 <div class="activity-card">
                   <div v-if="selectedFriend.currentTask" class="activity-item">
@@ -306,13 +301,6 @@
                     <div class="activity-content">
                       <span class="activity-label">正在学习</span>
                       <span class="activity-value">{{ selectedFriend.currentTask }}</span>
-                    </div>
-                  </div>
-                  <div v-if="selectedFriend.countdown" class="activity-item">
-                    <span class="activity-icon">⏱️</span>
-                    <div class="activity-content">
-                      <span class="activity-label">剩余时间</span>
-                      <span class="activity-value countdown-display">{{ selectedFriend.countdown }}</span>
                     </div>
                   </div>
                 </div>
@@ -579,7 +567,7 @@
 </template>
 
 <script>
-import { searchUser, sendFriendRequest, getFriendRequests, processFriendRequest, getFriends, deleteFriend } from '@/api/friends'
+import { searchUser, sendFriendRequest, getFriendRequests, processFriendRequest, getFriends, deleteFriend, getFriendStats } from '@/api/friends'
 import { getCurrentUser } from '@/api/user'
 import avatarImage from '@/assets/images/avatar.png'
 import { API_BASE_URL } from '@/api/config'
@@ -611,7 +599,6 @@ export default {
       },
       showDeleteModal: false,
       deleting: false,
-      countdownTimers: {},
       activeTab: 'friends',
       selectedFriend: null,
       friendSubTab: 'info',
@@ -788,12 +775,8 @@ export default {
             ...friend,
             isOnline: (friend.friend_status || friend.status) === '在线' || (friend.friend_status || friend.status) === '专注中',
             tomatoStatus: this.getTomatoStatus(friend),
-            currentTask: this.getCurrentTask(friend),
-            countdown: null
+            currentTask: this.getCurrentTask(friend)
           }))
-          
-          // 启动倒计时更新
-          this.startCountdownTimers()
         } else {
           this.friendsList = []
         }
@@ -830,34 +813,6 @@ export default {
       return statusMap[status] || '空闲'
     },
 
-    startCountdownTimers() {
-      // 为每个正在学习的好友启动倒计时
-      this.friendsList.forEach(friend => {
-        if (friend.tomatoStatus === 'studying') {
-          this.updateCountdown(friend)
-        }
-      })
-    },
-
-    updateCountdown(friend) {
-      // 模拟倒计时，实际应该从后端获取
-      if (friend.tomatoStatus === 'studying') {
-        let seconds = 25 * 60 // 25分钟番茄钟
-        const timer = setInterval(() => {
-          seconds--
-          if (seconds <= 0) {
-            clearInterval(timer)
-            friend.countdown = null
-            friend.tomatoStatus = 'resting'
-          } else {
-            const minutes = Math.floor(seconds / 60)
-            const secs = seconds % 60
-            friend.countdown = `${minutes}:${secs.toString().padStart(2, '0')}`
-          }
-        }, 1000)
-        this.countdownTimers[friend.friend_id] = timer
-      }
-    },
 
     selectFriend(friend) {
       this.selectedFriend = friend
@@ -885,41 +840,69 @@ export default {
       if (!this.selectedFriend) return
       
       this.loadingStats = true
-      // 加载好友学习统计数据
-      // 这里使用模拟数据，实际应该调用后端API
-      // 可以根据selectedFriend获取真实数据
       try {
-        // 模拟API调用延迟
-        await new Promise(resolve => setTimeout(resolve, 500))
+        // 获取好友用户名
+        const friendUsername = this.selectedFriend.friend_name || 
+                              this.selectedFriend.friend_username || 
+                              this.selectedFriend.username
         
-        this.friendStats = {
-          todayTomatoes: Math.floor(Math.random() * 10) + 1,
-          weeklyHours: [
-            { day: '周一', hours: Math.floor(Math.random() * 8) + 1 },
-            { day: '周二', hours: Math.floor(Math.random() * 8) + 1 },
-            { day: '周三', hours: Math.floor(Math.random() * 8) + 1 },
-            { day: '周四', hours: Math.floor(Math.random() * 8) + 1 },
-            { day: '周五', hours: Math.floor(Math.random() * 8) + 1 },
-            { day: '周六', hours: Math.floor(Math.random() * 8) + 1 },
-            { day: '周日', hours: Math.floor(Math.random() * 8) + 1 }
-          ],
-          monthlyTasks: [
-            { date: '1', count: Math.floor(Math.random() * 10) + 1 },
-            { date: '5', count: Math.floor(Math.random() * 10) + 1 },
-            { date: '10', count: Math.floor(Math.random() * 10) + 1 },
-            { date: '15', count: Math.floor(Math.random() * 10) + 1 },
-            { date: '20', count: Math.floor(Math.random() * 10) + 1 },
-            { date: '25', count: Math.floor(Math.random() * 10) + 1 },
-            { date: '30', count: Math.floor(Math.random() * 10) + 1 }
-          ],
-          topSubjects: [
-            { name: '离散数学', count: 15 },
-            { name: '数据结构', count: 12 },
-            { name: '算法分析', count: 8 }
-          ]
+        if (!friendUsername) {
+          throw new Error('无法获取好友用户名')
+        }
+
+        // 调用后端API获取好友统计数据
+        const response = await getFriendStats(friendUsername)
+        
+        if (response.success && response.data) {
+          this.friendStats = {
+            todayTomatoes: response.data.todayTomatoes || 0,
+            weeklyHours: response.data.weeklyHours || [
+              { day: '周一', hours: 0 },
+              { day: '周二', hours: 0 },
+              { day: '周三', hours: 0 },
+              { day: '周四', hours: 0 },
+              { day: '周五', hours: 0 },
+              { day: '周六', hours: 0 },
+              { day: '周日', hours: 0 }
+            ],
+            monthlyTasks: response.data.monthlyTasks || [],
+            topSubjects: response.data.topSubjects || []
+          }
+        } else {
+          // API返回失败，显示空数据
+          console.warn('获取好友统计数据失败:', response.message)
+          this.friendStats = {
+            todayTomatoes: 0,
+            weeklyHours: [
+              { day: '周一', hours: 0 },
+              { day: '周二', hours: 0 },
+              { day: '周三', hours: 0 },
+              { day: '周四', hours: 0 },
+              { day: '周五', hours: 0 },
+              { day: '周六', hours: 0 },
+              { day: '周日', hours: 0 }
+            ],
+            monthlyTasks: [],
+            topSubjects: []
+          }
         }
       } catch (error) {
         console.error('加载统计数据失败:', error)
+        // 出错时设置为空数据
+        this.friendStats = {
+          todayTomatoes: 0,
+          weeklyHours: [
+            { day: '周一', hours: 0 },
+            { day: '周二', hours: 0 },
+            { day: '周三', hours: 0 },
+            { day: '周四', hours: 0 },
+            { day: '周五', hours: 0 },
+            { day: '周六', hours: 0 },
+            { day: '周日', hours: 0 }
+          ],
+          monthlyTasks: [],
+          topSubjects: []
+        }
       } finally {
         this.loadingStats = false
       }
@@ -1080,8 +1063,6 @@ export default {
     }
   },
   beforeUnmount() {
-    // 清理所有倒计时定时器
-    Object.values(this.countdownTimers).forEach(timer => clearInterval(timer))
     // 清理自动刷新定时器
     this.stopAutoRefresh()
   }

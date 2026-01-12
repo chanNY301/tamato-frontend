@@ -4,14 +4,14 @@
     <nav class="navbar">
       <div class="nav-brand">Tomato</div>
       <div class="nav-links">
-        <!-- 房主显示退出按钮，普通成员显示退出按钮 -->
+        <!-- 房主显示解散按钮，普通成员显示退出按钮 -->
         <button
           v-if="isRoomOwner"
-          @click="leaveRoomAsHost"
+          @click="disbandRoom"
           class="nav-link"
-          title="退出自习室"
+          title="解散自习室"
         >
-          退出自习室
+          解散自习室
         </button>
         <button v-else @click="leaveRoom" class="nav-link">退出房间</button>
       </div>
@@ -62,25 +62,9 @@
               <span class="meta-item"
                 >最大人数: {{ roomInfo.max_members || 4 }}</span
               >
-              <!-- 调试信息：显示房主状态 -->
-              <span
-                v-if="!isRoomOwner && members.length > 0"
-                class="meta-item debug-info"
-                style="color: #999; font-size: 0.85em"
-              >
-                 当前用户角色 = {{ getCurrentUserRole() }}
-              </span>
             </div>
           </div>
           <div class="room-actions">
-            <button
-              v-if="isRoomOwner"
-              @click="disbandRoom"
-              class="action-btn disband-btn"
-            >
-              <span class="btn-icon">🗑️</span>
-              <span class="btn-text">解散自习室</span>
-            </button>
             <button
               v-if="isRoomOwner"
               @click="showRoomSettings"
@@ -1623,6 +1607,11 @@ export default {
 
 .room-title-section {
   flex: 1;
+}
+
+.room-actions {
+  display: flex;
+  align-items: center;
 }
 
 .room-title {

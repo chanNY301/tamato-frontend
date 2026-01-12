@@ -196,7 +196,7 @@
             确定要提前结束当前任务"{{ selectedTask ? getTaskName(selectedTask) : '' }}"吗？
           </p>
           <p class="modal-tip">
-            如果选择"是"，该任务将被标记为已完成，相关信息将保存到数据库。
+            如果选择"是"，该任务将被标记为已完成。
           </p>
         </div>
         <div class="modal-actions">
@@ -288,7 +288,7 @@
 </template>
 
 <script>
-import { getTasks, updateTask } from '@/api/tasks'
+import { getTasks } from '@/api/tasks'
 import { getCurrentUser } from '@/api/user'
 
 // 鼓励话语语料库
@@ -565,20 +565,50 @@ export default {
       // 关闭任务选择弹窗
       this.showTaskSelect = false;
 
-      // 更新任务状态为"进行中"
+      // 调用startFocus API创建专注会话记录（这会自动更新任务状态为"进行中"）
       try {
         const taskId = this.getTaskId(this.selectedTask);
-        await updateTask(taskId, {
-          task_name: this.getTaskName(this.selectedTask),
-          task_note: this.getTaskNote(this.selectedTask) || null,
-          duration: duration,
-          status: '进行中',
-          taskStatus: '进行中'
-        });
-        console.log("任务状态已更新为'进行中'");
-      } catch (error) {
-        console.error("更新任务状态失败:", error);
-        // 即使更新失败，也继续开始计时器
+        const taskName = this.getTaskName(this.selectedTask);
+        
+        // 先调用startFocus API（此时任务状态应该是"未完成"，startFocus会将其更新为"进行中"）
+        const { startFocus } = await import('@/api/user');
+        await startFocus(taskName);
+        console.log("已调用 startFocus API 创建专注会话");
+        
+        // startFocus 已经更新了任务状态为"进行中"和开始时间
+        // 如果需要更新其他字段（如task_note、duration），可以在这里更新
+        try {
+          const { updateTask } = await import('@/api/tasks');
+          await updateTask(taskId, {
+            task_name: taskName,
+            task_note: this.getTaskNote(this.selectedTask) || null,
+            duration: duration
+            // 注意：不更新status，因为startFocus已经更新了
+          });
+          console.log("任务其他字段已更新");
+        } catch (updateError) {
+          console.warn("更新任务其他字段失败，但不影响专注:", updateError);
+          // 即使更新失败，也不影响专注流程
+        }
+      } catch (startFocusError) {
+        console.error("调用 startFocus API 失败:", startFocusError);
+        // 如果startFocus失败，尝试手动更新任务状态，保证至少任务状态正确
+        try {
+          const taskId = this.getTaskId(this.selectedTask);
+          const taskName = this.getTaskName(this.selectedTask);
+          const { updateTask } = await import('@/api/tasks');
+          await updateTask(taskId, {
+            task_name: taskName,
+            task_note: this.getTaskNote(this.selectedTask) || null,
+            duration: duration,
+            status: '进行中',
+            taskStatus: '进行中'
+          });
+          console.warn("startFocus失败，已手动更新任务状态为'进行中'");
+        } catch (fallbackError) {
+          console.error("手动更新任务状态也失败:", fallbackError);
+        }
+        // 即使startFocus失败，也继续开始计时器，保证用户体验
       }
 
       // 立即发出状态变更事件，确保状态同步及时
@@ -629,7 +659,19 @@ export default {
     },
 
     // 重命名为避免重复
-    startBreakSession() {
+    async startBreakSession() {
+      // 专注完成，调用 stopFocus API 保存专注时长
+      if (this.selectedTask && this.isFocusing) {
+        try {
+          const { stopFocus } = await import('@/api/user');
+          await stopFocus();
+          console.log("专注完成，已调用 stopFocus API 保存专注时长");
+        } catch (stopError) {
+          console.warn("调用 stopFocus API 失败:", stopError);
+          // 即使 stopFocus 失败，也继续进入休息状态，保证用户体验
+        }
+      }
+      
       this.completedSessions++;
       this.isBreak = true;
       this.isFocusing = false; // 休息时不在专注中
@@ -692,13 +734,25 @@ export default {
       this.$emit("user-status-change", "focusing"); // 恢复时状态变为专注
     },
 
-    stopTimer() {
+    async stopTimer() {
       // 如果有选中的任务，显示任务提前结束确认框
       if (this.selectedTask && !this.isBreak) {
         this.showTaskEndConfirm = true;
       } else {
         // 没有任务或处于休息状态，直接终止
         if (confirm("确定要终止当前的专注吗？")) {
+          // 如果正在专注，调用 stopFocus API 保存专注时长
+          if (this.isFocusing && this.selectedTask) {
+            try {
+              const { stopFocus } = await import('@/api/user');
+              await stopFocus();
+              console.log("已调用 stopFocus API 保存专注时长");
+            } catch (stopError) {
+              console.warn("调用 stopFocus API 失败:", stopError);
+              // 即使 stopFocus 失败，也继续终止，保证用户体验
+            }
+          }
+          
           this.isFocusing = false; // 停止专注
           this.clearTimers();
           this.resetTimer();
