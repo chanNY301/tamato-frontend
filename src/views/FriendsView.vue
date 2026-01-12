@@ -98,13 +98,6 @@
                 
                 <div class="friend-actions">
                   <button 
-                    @click.stop="showFriendOverview(friend)"
-                    class="btn-view-info"
-                    title="查看详细信息"
-                  >
-                    ℹ️
-                  </button>
-                  <button 
                     @click.stop="showDeleteConfirm(friend)"
                     class="btn-delete-friend"
                     title="删除好友"
@@ -256,13 +249,6 @@
                 <span class="tab-icon">👤</span>
                 个人信息
               </button>
-              <button 
-                :class="['nav-tab', { active: friendSubTab === 'stats' }]"
-                @click="friendSubTab = 'stats'; loadFriendStats()"
-              >
-                <span class="tab-icon">📊</span>
-                学习统计
-              </button>
             </div>
 
             <!-- 个人信息标签页 -->
@@ -306,85 +292,6 @@
                 </div>
               </div>
             </div>
-
-            <!-- 学习统计标签页 -->
-            <div v-if="friendSubTab === 'stats'" class="profile-content">
-              <div v-if="loadingStats" class="loading-state">
-                <div class="spinner"></div>
-                <p>加载统计数据中...</p>
-              </div>
-              <div v-else>
-                <!-- 今日统计 -->
-                <div class="stat-card-overview">
-                  <div class="stat-item">
-                    <div class="stat-icon">🍅</div>
-                    <div class="stat-details">
-                      <div class="stat-value">{{ friendStats.todayTomatoes || 0 }}</div>
-                      <div class="stat-label">今日番茄</div>
-                    </div>
-                  </div>
-                </div>
-
-                <!-- 学习时长图表 -->
-                <div class="chart-section">
-                  <h4 class="chart-title">本周学习时长</h4>
-                  <div class="bar-chart">
-                    <div 
-                      v-for="(day, index) in friendStats.weeklyHours" 
-                      :key="index"
-                      class="bar-item"
-                    >
-                      <div class="bar" :style="{ height: getBarHeight(day.hours) + '%' }"></div>
-                      <div class="bar-label">{{ day.day }}</div>
-                      <div class="bar-value">{{ day.hours }}h</div>
-                    </div>
-                  </div>
-                </div>
-
-                <!-- 任务完成数图表 -->
-                <div class="chart-section">
-                  <h4 class="chart-title">本月任务完成数</h4>
-                  <div class="line-chart">
-                    <svg class="chart-svg" viewBox="0 0 400 150">
-                      <polyline
-                        :points="getLineChartPoints(friendStats.monthlyTasks)"
-                        fill="none"
-                        stroke="#eeaa67"
-                        stroke-width="2"
-                      />
-                      <circle
-                        v-for="(task, index) in friendStats.monthlyTasks"
-                        :key="index"
-                        :cx="(index / (friendStats.monthlyTasks.length - 1 || 1)) * 380 + 10"
-                        :cy="150 - (task.count / Math.max(...friendStats.monthlyTasks.map(t => t.count), 1)) * 130"
-                        r="4"
-                        fill="#eeaa67"
-                      />
-                    </svg>
-                    <div class="chart-labels">
-                      <span v-for="(task, index) in friendStats.monthlyTasks" :key="index" class="chart-label">
-                        {{ task.date }}
-                      </span>
-                    </div>
-                  </div>
-                </div>
-
-                <!-- 最常学习的科目 -->
-                <div class="subjects-section">
-                  <h4 class="chart-title">最常学习的科目</h4>
-                  <div class="subject-tags">
-                    <span 
-                      v-for="(subject, index) in friendStats.topSubjects" 
-                      :key="index"
-                      class="subject-tag"
-                    >
-                      {{ subject.name }}
-                      <span class="subject-count">{{ subject.count }}次</span>
-                    </span>
-                  </div>
-                </div>
-              </div>
-            </div>
           </div>
 
           <!-- 默认提示 -->
@@ -414,99 +321,6 @@
       </div>
     </div>
 
-    <!-- 好友学习概览模态框 -->
-    <div v-if="showFriendOverviewModal" class="modal-overlay" @click="closeFriendOverview">
-      <div class="modal-content friend-overview-modal" @click.stop>
-        <div class="overview-header">
-          <div class="overview-avatar">
-            <img 
-              :src="getAvatarUrl(selectedFriend?.friend_avatar || selectedFriend?.avatar)" 
-              alt="好友头像"
-              @error="handleAvatarError"
-            />
-          </div>
-          <div class="overview-info">
-            <h3 class="overview-name">{{ selectedFriend?.friend_name || selectedFriend?.friend_username || selectedFriend?.username }}</h3>
-            <span :class="['overview-status', getStatusClass(selectedFriend?.friend_status || selectedFriend?.status)]">
-              {{ selectedFriend?.friend_status || selectedFriend?.status || '离线' }}
-            </span>
-          </div>
-          <button @click="closeFriendOverview" class="close-btn">×</button>
-        </div>
-
-        <div class="overview-content">
-          <!-- 今日统计 -->
-          <div class="stat-card-overview">
-            <div class="stat-item">
-              <div class="stat-icon">🍅</div>
-              <div class="stat-details">
-                <div class="stat-value">{{ friendStats.todayTomatoes || 0 }}</div>
-                <div class="stat-label">今日番茄</div>
-              </div>
-            </div>
-          </div>
-
-          <!-- 学习时长图表 -->
-          <div class="chart-section">
-            <h4 class="chart-title">本周学习时长</h4>
-            <div class="bar-chart">
-              <div 
-                v-for="(day, index) in friendStats.weeklyHours" 
-                :key="index"
-                class="bar-item"
-              >
-                <div class="bar" :style="{ height: getBarHeight(day.hours) + '%' }"></div>
-                <div class="bar-label">{{ day.day }}</div>
-                <div class="bar-value">{{ day.hours }}h</div>
-              </div>
-            </div>
-          </div>
-
-          <!-- 任务完成数图表 -->
-          <div class="chart-section">
-            <h4 class="chart-title">本月任务完成数</h4>
-            <div class="line-chart">
-              <svg class="chart-svg" viewBox="0 0 400 150">
-                <polyline
-                  :points="getLineChartPoints(friendStats.monthlyTasks)"
-                  fill="none"
-                  stroke="#eeaa67"
-                  stroke-width="2"
-                />
-                <circle
-                  v-for="(task, index) in friendStats.monthlyTasks"
-                  :key="index"
-                  :cx="(index / (friendStats.monthlyTasks.length - 1 || 1)) * 380 + 10"
-                  :cy="150 - (task.count / Math.max(...friendStats.monthlyTasks.map(t => t.count), 1)) * 130"
-                  r="4"
-                  fill="#eeaa67"
-                />
-              </svg>
-              <div class="chart-labels">
-                <span v-for="(task, index) in friendStats.monthlyTasks" :key="index" class="chart-label">
-                  {{ task.date }}
-                </span>
-              </div>
-            </div>
-          </div>
-
-          <!-- 最常学习的科目 -->
-          <div class="subjects-section">
-            <h4 class="chart-title">最常学习的科目</h4>
-            <div class="subject-tags">
-              <span 
-                v-for="(subject, index) in friendStats.topSubjects" 
-                :key="index"
-                class="subject-tag"
-              >
-                {{ subject.name }}
-                <span class="subject-count">{{ subject.count }}次</span>
-              </span>
-            </div>
-          </div>
-        </div>
-      </div>
-    </div>
 
     <!-- 删除好友确认对话框 -->
     <div v-if="showDeleteModal" class="modal-overlay" @click="closeDeleteModal">
@@ -567,7 +381,7 @@
 </template>
 
 <script>
-import { searchUser, sendFriendRequest, getFriendRequests, processFriendRequest, getFriends, deleteFriend, getFriendStats } from '@/api/friends'
+import { searchUser, sendFriendRequest, getFriendRequests, processFriendRequest, getFriends, deleteFriend } from '@/api/friends'
 import { getCurrentUser } from '@/api/user'
 import avatarImage from '@/assets/images/avatar.png'
 import { API_BASE_URL } from '@/api/config'
@@ -590,19 +404,11 @@ export default {
       showUserNotFoundModal: false,
       friendsList: [],
       loadingFriends: false,
-      showFriendOverviewModal: false,
-      friendStats: {
-        todayTomatoes: 0,
-        weeklyHours: [],
-        monthlyTasks: [],
-        topSubjects: []
-      },
       showDeleteModal: false,
       deleting: false,
       activeTab: 'friends',
       selectedFriend: null,
       friendSubTab: 'info',
-      loadingStats: false,
       refreshTimer: null, // 好友列表自动刷新定时器
       refreshInterval: 10000 // 每10秒刷新一次好友状态
     }
@@ -820,108 +626,10 @@ export default {
       this.friendSubTab = 'info' // 默认显示个人信息
     },
 
-    showFriendOverview(friend) {
-      this.selectedFriend = friend
-      this.loadFriendStats()
-      this.showFriendOverviewModal = true
-    },
 
     refreshFriends() {
       this.loadFriends()
       this.loadFriendRequests()
-    },
-
-    closeFriendOverview() {
-      this.showFriendOverviewModal = false
-      this.selectedFriend = null
-    },
-
-    async loadFriendStats() {
-      if (!this.selectedFriend) return
-      
-      this.loadingStats = true
-      try {
-        // 获取好友用户名
-        const friendUsername = this.selectedFriend.friend_name || 
-                              this.selectedFriend.friend_username || 
-                              this.selectedFriend.username
-        
-        if (!friendUsername) {
-          throw new Error('无法获取好友用户名')
-        }
-
-        // 调用后端API获取好友统计数据
-        const response = await getFriendStats(friendUsername)
-        
-        if (response.success && response.data) {
-          this.friendStats = {
-            todayTomatoes: response.data.todayTomatoes || 0,
-            weeklyHours: response.data.weeklyHours || [
-              { day: '周一', hours: 0 },
-              { day: '周二', hours: 0 },
-              { day: '周三', hours: 0 },
-              { day: '周四', hours: 0 },
-              { day: '周五', hours: 0 },
-              { day: '周六', hours: 0 },
-              { day: '周日', hours: 0 }
-            ],
-            monthlyTasks: response.data.monthlyTasks || [],
-            topSubjects: response.data.topSubjects || []
-          }
-        } else {
-          // API返回失败，显示空数据
-          console.warn('获取好友统计数据失败:', response.message)
-          this.friendStats = {
-            todayTomatoes: 0,
-            weeklyHours: [
-              { day: '周一', hours: 0 },
-              { day: '周二', hours: 0 },
-              { day: '周三', hours: 0 },
-              { day: '周四', hours: 0 },
-              { day: '周五', hours: 0 },
-              { day: '周六', hours: 0 },
-              { day: '周日', hours: 0 }
-            ],
-            monthlyTasks: [],
-            topSubjects: []
-          }
-        }
-      } catch (error) {
-        console.error('加载统计数据失败:', error)
-        // 出错时设置为空数据
-        this.friendStats = {
-          todayTomatoes: 0,
-          weeklyHours: [
-            { day: '周一', hours: 0 },
-            { day: '周二', hours: 0 },
-            { day: '周三', hours: 0 },
-            { day: '周四', hours: 0 },
-            { day: '周五', hours: 0 },
-            { day: '周六', hours: 0 },
-            { day: '周日', hours: 0 }
-          ],
-          monthlyTasks: [],
-          topSubjects: []
-        }
-      } finally {
-        this.loadingStats = false
-      }
-    },
-
-    getBarHeight(hours) {
-      if (!this.friendStats.weeklyHours || this.friendStats.weeklyHours.length === 0) return 0
-      const maxHours = Math.max(...this.friendStats.weeklyHours.map(d => d.hours), 1)
-      return (hours / maxHours) * 100
-    },
-
-    getLineChartPoints(tasks) {
-      if (!tasks || tasks.length === 0) return ''
-      const maxCount = Math.max(...tasks.map(t => t.count), 1)
-      return tasks.map((task, index) => {
-        const x = (index / (tasks.length - 1 || 1)) * 380 + 10
-        const y = 150 - (task.count / maxCount) * 130
-        return `${x},${y}`
-      }).join(' ')
     },
 
     showDeleteConfirm(friend) {
@@ -1133,6 +841,7 @@ export default {
   font-weight: 700;
   margin: 0 0 12px 0;
   background: linear-gradient(135deg, #eeaa67, #ff8c42);
+  background-clip: text;
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
 }
